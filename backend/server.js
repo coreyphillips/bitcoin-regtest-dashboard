@@ -791,8 +791,61 @@ app.get('*', (req, res) => {
   res.sendFile('/app/frontend/index.html');
 });
 
+// Ensure wallet exists and is loaded on startup
+async function initializeWallet() {
+  const maxRetries = 30;
+  const retryDelay = 5000; // 5 seconds
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Wallet initialization attempt ${attempt}/${maxRetries}...`);
+
+      // Check if wallet is already loaded
+      const loadedWallets = await bitcoinRPC('listwallets');
+      if (loadedWallets.includes(RPC_WALLET)) {
+        console.log(`Wallet '${RPC_WALLET}' is already loaded.`);
+        return true;
+      }
+
+      // Try to load the wallet
+      try {
+        await bitcoinRPC('loadwallet', [RPC_WALLET]);
+        console.log(`Wallet '${RPC_WALLET}' loaded successfully.`);
+        return true;
+      } catch (loadError) {
+        // Wallet doesn't exist, create it
+        if (loadError.message.includes('not found') || loadError.message.includes('does not exist')) {
+          console.log(`Wallet '${RPC_WALLET}' not found, creating...`);
+          await bitcoinRPC('createwallet', [RPC_WALLET]);
+          console.log(`Wallet '${RPC_WALLET}' created successfully.`);
+          return true;
+        }
+        throw loadError;
+      }
+    } catch (error) {
+      console.log(`Wallet initialization failed: ${error.message}`);
+      if (attempt < maxRetries) {
+        console.log(`Retrying in ${retryDelay / 1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+  }
+
+  console.error(`Failed to initialize wallet after ${maxRetries} attempts.`);
+  return false;
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Bitcoin Regtest Dashboard API running on port ${PORT}`);
   console.log(`Connecting to Bitcoin RPC at ${RPC_HOST}:${RPC_PORT}`);
+
+  // Initialize wallet after server starts (Bitcoin Core may take time to be ready)
+  initializeWallet().then(success => {
+    if (success) {
+      console.log('Wallet initialization complete.');
+    } else {
+      console.log('Warning: Wallet initialization failed. Some features may not work until Bitcoin Core is available.');
+    }
+  });
 });
