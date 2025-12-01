@@ -380,10 +380,58 @@ app.post('/api/transaction/cancel', async (req, res) => {
     // Get a new address to send funds to (ourselves)
     const cancelAddress = await bitcoinRPC('getnewaddress', ['cancel', 'bech32'], true);
 
-    // Bump fee with a high fee rate to prioritize and send to ourselves
+    // Decode the transaction to get input details and vsize
+    const decoded = await bitcoinRPC('decoderawtransaction', [tx.hex]);
+
+    // Calculate the original transaction's fee rate
+    // tx.fee is negative (outgoing), so we use Math.abs
+    const originalFeeBTC = Math.abs(tx.fee);
+    const originalFeeSats = originalFeeBTC * 100000000;
+    const originalVsize = decoded.vsize;
+    const originalFeeRate = originalFeeSats / originalVsize;
+
+    // Calculate new fee rate: original + 10 sat/vB (or at least 2x for very low fee txs)
+    // BIP125 requires: new fee >= old fee + incremental relay fee (typically 1 sat/vB)
+    // We use a higher increment to ensure quick replacement
+    const minIncrement = 10; // sat/vB
+    const newFeeRate = Math.max(
+      Math.ceil(originalFeeRate + minIncrement),
+      Math.ceil(originalFeeRate * 2), // At least double for very low fee txs
+      2 // Absolute minimum
+    );
+
+    // Calculate total input value by looking up each input's previous output
+    let totalInputValue = 0;
+    for (const input of decoded.vin) {
+      try {
+        // Try to get the previous transaction from wallet
+        const prevTx = await bitcoinRPC('gettransaction', [input.txid, true, true], true);
+        const prevDecoded = await bitcoinRPC('decoderawtransaction', [prevTx.hex]);
+        totalInputValue += prevDecoded.vout[input.vout].value;
+      } catch (e) {
+        // If not in wallet, try getrawtransaction
+        const prevTxHex = await bitcoinRPC('getrawtransaction', [input.txid, true]);
+        totalInputValue += prevTxHex.vout[input.vout].value;
+      }
+    }
+
+    // Estimate the size of the replacement transaction
+    // P2WPKH input: ~68 vbytes, P2WPKH output: ~31 vbytes, overhead: ~10 vbytes
+    const estimatedVsize = decoded.vin.length * 68 + 31 + 10;
+    const estimatedFee = (estimatedVsize * newFeeRate) / 100000000; // sat/vB to BTC
+
+    // Calculate output amount: total inputs minus estimated fee
+    // Round to 8 decimal places to avoid floating point issues
+    const outputAmount = Math.round((totalInputValue - estimatedFee) * 100000000) / 100000000;
+
+    if (outputAmount <= 0.00000546) { // Dust threshold
+      throw new Error('Insufficient funds to cover cancellation fee');
+    }
+
+    // Use bumpfee with outputs to redirect all funds to our cancel address
     const result = await bitcoinRPC('bumpfee', [txid, {
-      fee_rate: 100, // High fee rate to ensure replacement
-      outputs: [{ [cancelAddress]: 0.00000001 }] // Minimal output
+      fee_rate: newFeeRate,
+      outputs: [{ [cancelAddress]: outputAmount }]
     }], true);
 
     res.json({
@@ -391,7 +439,10 @@ app.post('/api/transaction/cancel', async (req, res) => {
       originalTxid: txid,
       replacementTxid: result.txid,
       cancelAddress: cancelAddress,
-      newFee: result.fee
+      originalFeeRate: Math.round(originalFeeRate * 100) / 100,
+      newFeeRate: newFeeRate,
+      newFee: result.fee,
+      amountRecovered: outputAmount
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
