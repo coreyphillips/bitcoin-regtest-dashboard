@@ -702,7 +702,7 @@
       </h3>
 
       <div class="theme-presets">
-        <label>Presets</label>
+        <label>Dark Themes</label>
         <div class="preset-grid">
           <button class="preset-btn" style="background: #f7931a;" onclick="applyPreset('bitcoin')" title="Bitcoin Orange"></button>
           <button class="preset-btn" style="background: #22c55e;" onclick="applyPreset('green')" title="Green"></button>
@@ -712,6 +712,18 @@
           <button class="preset-btn" style="background: #ec4899;" onclick="applyPreset('pink')" title="Pink"></button>
           <button class="preset-btn" style="background: #14b8a6;" onclick="applyPreset('teal')" title="Teal"></button>
           <button class="preset-btn" style="background: #eab308;" onclick="applyPreset('yellow')" title="Yellow"></button>
+        </div>
+      </div>
+
+      <div class="theme-presets">
+        <label>Light Themes</label>
+        <div class="preset-grid">
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #3b82f6 50%);" onclick="applyPreset('lightBlue')" title="Light Blue"></button>
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #22c55e 50%);" onclick="applyPreset('lightGreen')" title="Light Green"></button>
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #a855f7 50%);" onclick="applyPreset('lightPurple')" title="Light Purple"></button>
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #f7931a 50%);" onclick="applyPreset('lightOrange')" title="Light Orange"></button>
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #64748b 50%);" onclick="applyPreset('lightGray')" title="Light Gray"></button>
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #14b8a6 50%);" onclick="applyPreset('lightTeal')" title="Light Teal"></button>
         </div>
       </div>
 
@@ -1772,6 +1784,7 @@
     };
 
     const presets = {
+      // Dark themes
       bitcoin: { accent: '#f7931a', bg: '#0d1117', card: '#161b22', text: '#f0f6fc' },
       green: { accent: '#22c55e', bg: '#0a0f0a', card: '#111a11', text: '#f0f6fc' },
       blue: { accent: '#3b82f6', bg: '#0a0f17', card: '#111827', text: '#f0f6fc' },
@@ -1779,7 +1792,14 @@
       red: { accent: '#ef4444', bg: '#170a0a', card: '#271111', text: '#f0f6fc' },
       pink: { accent: '#ec4899', bg: '#170a11', card: '#27111a', text: '#f0f6fc' },
       teal: { accent: '#14b8a6', bg: '#0a1717', card: '#112222', text: '#f0f6fc' },
-      yellow: { accent: '#eab308', bg: '#17150a', card: '#222011', text: '#f0f6fc' }
+      yellow: { accent: '#eab308', bg: '#17150a', card: '#222011', text: '#f0f6fc' },
+      // Light themes
+      lightBlue: { accent: '#3b82f6', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' },
+      lightGreen: { accent: '#22c55e', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' },
+      lightPurple: { accent: '#a855f7', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' },
+      lightOrange: { accent: '#f7931a', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' },
+      lightGray: { accent: '#64748b', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' },
+      lightTeal: { accent: '#14b8a6', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' }
     };
 
     function toggleThemePanel() {
