@@ -673,9 +673,9 @@
   <div class="container">
     <header>
       <div class="logo">
-        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="32" cy="32" r="32" fill="#3b82f6"/>
-          <path fill="#fff" d="M45.5 30.8c.6-4.2-2.6-6.5-7-8l1.4-5.7-3.5-.9-1.4 5.5c-.9-.2-1.8-.5-2.8-.7l1.4-5.5-3.5-.9-1.4 5.7c-.8-.2-1.5-.4-2.2-.5l-4.8-1.2-.9 3.7s2.6.6 2.5.6c1.4.4 1.7 1.3 1.6 2l-1.6 6.5c.1 0 .2 0 .4.1-.1 0-.3-.1-.4-.1l-2.3 9.1c-.2.4-.5 1-1.4.8 0 0-2.5-.6-2.5-.6l-1.7 4 4.5 1.1c.8.2 1.7.4 2.5.6l-1.4 5.8 3.5.9 1.4-5.7c1 .3 1.9.5 2.8.8l-1.4 5.7 3.5.9 1.4-5.8c6 1.1 10.5.7 12.4-4.7 1.5-4.4-.1-6.9-3.3-8.5 2.3-.6 4.1-2.1 4.6-5.2zm-8.2 11.5c-1.1 4.4-8.4 2-10.8 1.4l1.9-7.7c2.4.6 10 1.8 8.9 6.3zm1.1-11.5c-1 3.9-7.1 1.9-9 1.4l1.8-7c2 .5 8.3 1.4 7.3 5.6z"/>
+        <svg viewBox="0 90.7 612 611.1" xmlns="http://www.w3.org/2000/svg" style="width: 40px; height: 40px;">
+          <path fill="#3b82f6" d="M602.7,470c-40.8,163.6-206.6,263.5-370.6,222.7C68.4,651.8-31.4,486.1,9.4,322.5S215.9,59,379.5,99.8C543.6,140.1,643.4,306.3,602.7,470z"/>
+          <path fill="#FFFFFF" d="M450.9,356.5c5.5-40.8-25.5-62.1-68-76.5l13.2-55.2l-33.6-8.1l-12.8,54c-8.9-2.1-17.9-4.2-26.8-6l12.8-54l-34-8.1l-13.2,55.2c-7.2-1.7-14.5-3-21.7-4.7l0,0l-46.3-11.1l-8.5,35.7c0,0,25.1,5.5,24.2,6c13.6,3.4,16.2,12.3,15.7,19.1l-14.9,62.9c0.9,0.4,2.1,0.4,3.4,1.3c-1.3-0.4-2.1-0.4-3.4-0.8l-20.4,88c-1.7,4.2-6,10.2-15.3,8.1c0.4,0.4-24.7-6-24.7-6L160.7,495l43.8,10.2c8.1,2.1,16.2,3.8,23.8,6l-13.2,55.7l33.6,8.1l13.2-55.2c9.4,2.5,18.3,4.7,26.8,6.8l-13.2,54.8l33.6,8.1l13.2-55.7c57.4,10.2,100.3,5.5,117.7-46.8c14-41.7-1.3-65.5-31.9-81.2C430.5,400.7,446.7,386.2,450.9,356.5zM375.3,464.8c-9.8,41.7-80.3,20-102.9,14.5l17.4-74C312.8,410.9,385.5,421.1,375.3,464.8zM384.6,356.5c-8.9,37.8-67.6,19.6-86.7,14.9l16.2-67.1C332.8,308.9,394,317,384.6,356.5z"/>
         </svg>
         <h1>Regtest <span>Dashboard</span></h1>
       </div>
@@ -1598,8 +1598,41 @@
         return diff.toExponential(2);
       } else if (diff < 1) {
         return diff.toFixed(8);
+      } else if (diff < 1000) {
+        return diff.toFixed(2);
+      } else if (diff < 1000000) {
+        return (diff / 1000).toFixed(2) + ' K';
+      } else if (diff < 1000000000) {
+        return (diff / 1000000).toFixed(2) + ' M';
+      } else if (diff < 1000000000000) {
+        return (diff / 1000000000).toFixed(2) + ' B';
       } else {
-        return diff.toLocaleString();
+        return (diff / 1000000000000).toFixed(2) + ' T';
+      }
+    }
+
+    // Format hashrate with appropriate unit
+    function formatHashrate(hashps) {
+      if (hashps === 0) return '0 H/s';
+
+      const units = ['H/s', 'KH/s', 'MH/s', 'GH/s', 'TH/s', 'PH/s', 'EH/s', 'ZH/s'];
+      let unitIndex = 0;
+      let value = hashps;
+
+      while (value >= 1000 && unitIndex < units.length - 1) {
+        value /= 1000;
+        unitIndex++;
+      }
+
+      // For very small values (like regtest), show more precision
+      if (value < 0.01) {
+        return value.toExponential(2) + ' ' + units[unitIndex];
+      } else if (value < 10) {
+        return value.toFixed(3) + ' ' + units[unitIndex];
+      } else if (value < 100) {
+        return value.toFixed(2) + ' ' + units[unitIndex];
+      } else {
+        return value.toFixed(1) + ' ' + units[unitIndex];
       }
     }
 
@@ -1617,8 +1650,8 @@
               <div class="value" title="${info.difficulty}">${formatDifficulty(info.difficulty)}</div>
             </div>
             <div class="stat-card">
-              <h3>Network Hash/s</h3>
-              <div class="value">${info.networkhashps.toFixed(2)}</div>
+              <h3>Hashrate</h3>
+              <div class="value" title="${info.networkhashps} H/s">${formatHashrate(info.networkhashps)}</div>
             </div>
           </div>
         `;
