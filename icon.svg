@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1e2e"/>
+      <stop offset="100%" style="stop-color:#11111b"/>
+    </linearGradient>
+    <linearGradient id="btc" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f9a825"/>
+      <stop offset="100%" style="stop-color:#f7931a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="4" y="4" width="192" height="192" rx="40" ry="40" fill="url(#bg)"/>
+  <rect x="4" y="4" width="192" height="192" rx="40" ry="40" fill="none" stroke="#f7931a" stroke-width="3"/>
+
+  <!-- Bitcoin B symbol -->
+  <g transform="translate(100, 95) scale(0.7)">
+    <path fill="url(#btc)" d="
+      M45 -60
+      c15-5 25-15 27-32
+      c3-25-15-38-42-47
+      l8-35 -21-5 -8 33
+      c-6-1.5-11-3-17-4.5
+      l8-33 -21-5 -8 35
+      c-5-1-10-2.5-14.5-3.5
+      l-29-7 -5.5 23
+      c0 0 16 3.5 15.5 4
+      c9 2 10.5 8.5 10 13.5
+      l-10 42
+      c1 0 2 0.5 3 1
+      c-1-0.5-2-0.5-3-0.5
+      l-14.5 58
+      c-1 2.5-3.5 6.5-9.5 5
+      c0.5 0.5-15.5-4-15.5-4
+      l-10.5 25
+      l27.5 7
+      c5 1.5 10 2.5 15 4
+      l-8.5 35
+      l21 5
+      l8.5-35
+      c5.5 1.5 11 3 16.5 4.5
+      l-8.5 34
+      l21 5
+      l8.5-35
+      c36 7 63 4 74-28.5
+      c9-26-0.5-41-19.5-51
+      M16 25
+      c-6.5 26-50 12-64 8.5
+      l11.5-46
+      c14 3.5 59.5 10.5 52.5 37.5
+      M24.5-35
+      c-6 24-42 12-54 9
+      l10.5-42
+      c12 3 50 8.5 43.5 33
+    "/>
+  </g>
+
+  <!-- Code brackets -->
+  <path d="M45 70 L25 100 L45 130" fill="none" stroke="#f7931a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <path d="M155 70 L175 100 L155 130" fill="none" stroke="#f7931a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+
+  <!-- Block/cube at bottom -->
+  <g transform="translate(100, 165) scale(0.6)">
+    <path d="M0 -20 L25 -8 L25 15 L0 27 L-25 15 L-25 -8 Z" fill="#f7931a" opacity="0.9"/>
+    <path d="M0 -20 L0 2 M0 2 L25 15 M0 2 L-25 15" fill="none" stroke="#11111b" stroke-width="2"/>
+  </g>
+</svg>

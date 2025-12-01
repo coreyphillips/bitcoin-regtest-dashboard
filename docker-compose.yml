@@ -1,0 +1,28 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: bitcoin-regtest-dashboard_web_1
+      APP_PORT: 3000
+
+  web:
+    build: .
+    image: bitcoin-regtest-dashboard:latest
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      BITCOIN_RPC_HOST: ${APP_BITCOIN_NODE_IP:-10.21.21.8}
+      BITCOIN_RPC_PORT: ${APP_BITCOIN_RPC_PORT:-18443}
+      BITCOIN_RPC_USER: ${APP_BITCOIN_RPC_USER:-umbrel}
+      BITCOIN_RPC_PASS: ${APP_BITCOIN_RPC_PASS:-moneyprintergobrrr}
+    networks:
+      default:
+        ipv4_address: 10.21.21.40
+    expose:
+      - "3000"
+
+networks:
+  default:
+    name: umbrel_main_network
+    external: true

@@ -1,0 +1,52 @@
+manifestVersion: 1
+id: bitcoin-regtest-dashboard
+name: Bitcoin Regtest Dashboard
+tagline: Development toolkit for Bitcoin regtest
+icon: https://raw.githubusercontent.com/devicons/devicon/master/icons/bitcoin/bitcoin-original.svg
+category: developer-tools
+version: "1.0.0"
+port: 3000
+description: >-
+  A comprehensive development dashboard for interacting with your Bitcoin regtest node.
+
+
+  Features include:
+
+  - Mine blocks instantly with one click
+
+  - Generate new addresses (all types supported)
+
+  - Send Bitcoin to any address
+
+  - View and manage UTXOs
+
+  - RBF (Replace-By-Fee) transactions
+
+  - Cancel unconfirmed transactions
+
+  - Browse mempool and blocks
+
+  - Decode and broadcast raw transactions
+
+  - Full RPC console for advanced commands
+
+  - PSBT support
+
+
+  Perfect for Bitcoin developers who need quick access to regtest node functionality
+  for testing wallets, applications, and Bitcoin integrations.
+developer: Bitcoin Regtest Dashboard
+website: https://github.com/example/bitcoin-regtest-dashboard
+submitter: Developer
+submission: https://github.com/example/bitcoin-regtest-dashboard
+repo: https://github.com/example/bitcoin-regtest-dashboard
+support: https://github.com/example/bitcoin-regtest-dashboard/issues
+gallery:
+  - https://raw.githubusercontent.com/example/bitcoin-regtest-dashboard/main/gallery/screenshot1.png
+releaseNotes: >-
+  Initial release with full regtest node interaction capabilities.
+dependencies:
+  - bitcoin
+path: ""
+defaultUsername: ""
+defaultPassword: ""

@@ -1,0 +1,1840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitcoin Regtest Dashboard</title>
+  <style>
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #21262d;
+      --border-color: #30363d;
+      --text-primary: #f0f6fc;
+      --text-secondary: #8b949e;
+      --accent-orange: #f7931a;
+      --accent-green: #238636;
+      --accent-red: #da3633;
+      --accent-blue: #58a6ff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 30px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo svg {
+      width: 40px;
+      height: 40px;
+    }
+
+    .logo h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .logo span {
+      color: var(--accent-orange);
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--bg-secondary);
+      border-radius: 20px;
+      font-size: 0.9rem;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-red);
+    }
+
+    .status-dot.connected {
+      background: var(--accent-green);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .stat-card h3 {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-card .value {
+      font-size: clamp(1rem, 3vw, 1.8rem);
+      font-weight: 600;
+      color: var(--accent-orange);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .stat-card .value.wrap-ok {
+      white-space: normal;
+      word-break: break-all;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+      overflow-x: auto;
+    }
+
+    .tab {
+      padding: 12px 24px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 0.95rem;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab:hover {
+      color: var(--text-primary);
+    }
+
+    .tab.active {
+      color: var(--accent-orange);
+      border-bottom-color: var(--accent-orange);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 12px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 1rem;
+    }
+
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: var(--accent-orange);
+    }
+
+    .form-group textarea {
+      min-height: 100px;
+      font-family: monospace;
+      resize: vertical;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--accent-orange);
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border-color);
+    }
+
+    .btn-danger {
+      background: var(--accent-red);
+      color: white;
+    }
+
+    .btn-success {
+      background: var(--accent-green);
+      color: white;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent-orange);
+      cursor: pointer;
+    }
+
+    .checkbox-group label {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    .result-box {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+      font-family: monospace;
+      font-size: 0.9rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .result-box.success {
+      border-color: var(--accent-green);
+    }
+
+    .result-box.error {
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+    }
+
+    .inline-form {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .inline-form .form-group {
+      margin-bottom: 0;
+      flex: 1;
+      min-width: 150px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    tr:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .truncate {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .badge-success {
+      background: rgba(35, 134, 54, 0.2);
+      color: var(--accent-green);
+    }
+
+    .badge-warning {
+      background: rgba(247, 147, 26, 0.2);
+      color: var(--accent-orange);
+    }
+
+    .badge-danger {
+      background: rgba(218, 54, 51, 0.2);
+      color: var(--accent-red);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 20px;
+    }
+
+    .copy-btn {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .copy-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .quick-action-btn {
+      padding: 16px 24px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      min-width: 120px;
+    }
+
+    .quick-action-btn:hover {
+      border-color: var(--accent-orange);
+      transform: translateY(-2px);
+    }
+
+    .quick-action-btn svg {
+      width: 28px;
+      height: 28px;
+      color: var(--accent-orange);
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border-color);
+      border-top-color: var(--accent-orange);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-secondary);
+    }
+
+    /* Theme Panel Styles */
+    .settings-btn {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .settings-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--accent-orange);
+    }
+
+    .settings-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .theme-panel {
+      position: fixed;
+      top: 0;
+      right: -320px;
+      width: 320px;
+      height: 100vh;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border-color);
+      padding: 24px;
+      z-index: 1000;
+      transition: right 0.3s ease;
+      overflow-y: auto;
+    }
+
+    .theme-panel.open {
+      right: 0;
+    }
+
+    .theme-panel-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+      display: none;
+    }
+
+    .theme-panel-overlay.open {
+      display: block;
+    }
+
+    .theme-panel h3 {
+      font-size: 1.2rem;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .theme-panel .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+
+    .theme-panel .close-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .color-option {
+      margin-bottom: 20px;
+    }
+
+    .color-option label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .color-picker-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .color-picker-wrapper input[type="color"] {
+      width: 50px;
+      height: 40px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: none;
+    }
+
+    .color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .color-picker-wrapper input[type="color"]::-webkit-color-swatch {
+      border: 2px solid var(--border-color);
+      border-radius: 6px;
+    }
+
+    .color-picker-wrapper input[type="text"] {
+      flex: 1;
+      padding: 10px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-primary);
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+
+    .theme-presets {
+      margin-bottom: 24px;
+    }
+
+    .theme-presets label {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .preset-btn {
+      width: 100%;
+      aspect-ratio: 1;
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .preset-btn:hover {
+      transform: scale(1.1);
+    }
+
+    .preset-btn.active {
+      border-color: var(--text-primary);
+      box-shadow: 0 0 0 2px var(--bg-primary);
+    }
+
+    .theme-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .theme-actions button {
+      flex: 1;
+    }
+
+    @media (max-width: 768px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+      .inline-form {
+        flex-direction: column;
+      }
+      .inline-form .form-group {
+        width: 100%;
+      }
+      .theme-panel {
+        width: 100%;
+        right: -100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="32" fill="#f7931a"/>
+          <path fill="#fff" d="M45.5 30.8c.6-4.2-2.6-6.5-7-8l1.4-5.7-3.5-.9-1.4 5.5c-.9-.2-1.8-.5-2.8-.7l1.4-5.5-3.5-.9-1.4 5.7c-.8-.2-1.5-.4-2.2-.5l-4.8-1.2-.9 3.7s2.6.6 2.5.6c1.4.4 1.7 1.3 1.6 2l-1.6 6.5c.1 0 .2 0 .4.1-.1 0-.3-.1-.4-.1l-2.3 9.1c-.2.4-.5 1-1.4.8 0 0-2.5-.6-2.5-.6l-1.7 4 4.5 1.1c.8.2 1.7.4 2.5.6l-1.4 5.8 3.5.9 1.4-5.7c1 .3 1.9.5 2.8.8l-1.4 5.7 3.5.9 1.4-5.8c6 1.1 10.5.7 12.4-4.7 1.5-4.4-.1-6.9-3.3-8.5 2.3-.6 4.1-2.1 4.6-5.2zm-8.2 11.5c-1.1 4.4-8.4 2-10.8 1.4l1.9-7.7c2.4.6 10 1.8 8.9 6.3zm1.1-11.5c-1 3.9-7.1 1.9-9 1.4l1.8-7c2 .5 8.3 1.4 7.3 5.6z"/>
+        </svg>
+        <h1>Regtest <span>Dashboard</span></h1>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="status-indicator">
+          <div class="status-dot" id="statusDot"></div>
+          <span id="statusText">Connecting...</span>
+        </div>
+        <button class="settings-btn" onclick="toggleThemePanel()" title="Theme Settings">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Theme Panel -->
+    <div class="theme-panel-overlay" id="themePanelOverlay" onclick="toggleThemePanel()"></div>
+    <div class="theme-panel" id="themePanel">
+      <h3>
+        Theme Settings
+        <button class="close-btn" onclick="toggleThemePanel()">&times;</button>
+      </h3>
+
+      <div class="theme-presets">
+        <label>Presets</label>
+        <div class="preset-grid">
+          <button class="preset-btn" style="background: #f7931a;" onclick="applyPreset('bitcoin')" title="Bitcoin Orange"></button>
+          <button class="preset-btn" style="background: #22c55e;" onclick="applyPreset('green')" title="Green"></button>
+          <button class="preset-btn" style="background: #3b82f6;" onclick="applyPreset('blue')" title="Blue"></button>
+          <button class="preset-btn" style="background: #a855f7;" onclick="applyPreset('purple')" title="Purple"></button>
+          <button class="preset-btn" style="background: #ef4444;" onclick="applyPreset('red')" title="Red"></button>
+          <button class="preset-btn" style="background: #ec4899;" onclick="applyPreset('pink')" title="Pink"></button>
+          <button class="preset-btn" style="background: #14b8a6;" onclick="applyPreset('teal')" title="Teal"></button>
+          <button class="preset-btn" style="background: #eab308;" onclick="applyPreset('yellow')" title="Yellow"></button>
+        </div>
+      </div>
+
+      <div class="color-option">
+        <label>Accent Color</label>
+        <div class="color-picker-wrapper">
+          <input type="color" id="accentColor" value="#f7931a" onchange="updateColor('accent', this.value)">
+          <input type="text" id="accentColorText" value="#f7931a" onchange="updateColorFromText('accent', this.value)">
+        </div>
+      </div>
+
+      <div class="color-option">
+        <label>Background</label>
+        <div class="color-picker-wrapper">
+          <input type="color" id="bgColor" value="#0d1117" onchange="updateColor('bg', this.value)">
+          <input type="text" id="bgColorText" value="#0d1117" onchange="updateColorFromText('bg', this.value)">
+        </div>
+      </div>
+
+      <div class="color-option">
+        <label>Card Background</label>
+        <div class="color-picker-wrapper">
+          <input type="color" id="cardColor" value="#161b22" onchange="updateColor('card', this.value)">
+          <input type="text" id="cardColorText" value="#161b22" onchange="updateColorFromText('card', this.value)">
+        </div>
+      </div>
+
+      <div class="color-option">
+        <label>Text Color</label>
+        <div class="color-picker-wrapper">
+          <input type="color" id="textColor" value="#f0f6fc" onchange="updateColor('text', this.value)">
+          <input type="text" id="textColorText" value="#f0f6fc" onchange="updateColorFromText('text', this.value)">
+        </div>
+      </div>
+
+      <div class="theme-actions">
+        <button class="btn btn-secondary" onclick="resetTheme()">Reset</button>
+        <button class="btn btn-primary" onclick="toggleThemePanel()">Done</button>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>Block Height</h3>
+        <div class="value" id="blockHeight">-</div>
+      </div>
+      <div class="stat-card">
+        <h3>Balance</h3>
+        <div class="value" id="walletBalance">-</div>
+      </div>
+      <div class="stat-card">
+        <h3>Mempool Size</h3>
+        <div class="value" id="mempoolSize">-</div>
+      </div>
+      <div class="stat-card">
+        <h3>Network</h3>
+        <div class="value" id="networkName">regtest</div>
+      </div>
+    </div>
+
+    <div class="quick-actions">
+      <button class="quick-action-btn" onclick="mineBlocks(1)">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        Mine 1 Block
+      </button>
+      <button class="quick-action-btn" onclick="mineBlocks(10)">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        Mine 10 Blocks
+      </button>
+      <button class="quick-action-btn" onclick="mineBlocks(100)">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        Mine 100 Blocks
+      </button>
+      <button class="quick-action-btn" onclick="generateNewAddress()">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        New Address
+      </button>
+      <button class="quick-action-btn" onclick="refreshAll()">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        Refresh
+      </button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="mining">Mining</button>
+      <button class="tab" data-tab="wallet">Wallet</button>
+      <button class="tab" data-tab="transactions">Transactions</button>
+      <button class="tab" data-tab="mempool">Mempool</button>
+      <button class="tab" data-tab="blocks">Blocks</button>
+      <button class="tab" data-tab="raw">Raw TX</button>
+      <button class="tab" data-tab="rpc">RPC Console</button>
+    </div>
+
+    <!-- Mining Tab -->
+    <div class="tab-content active" id="tab-mining">
+      <div class="grid-2">
+        <div class="card">
+          <h2>Mine Blocks</h2>
+          <div class="inline-form">
+            <div class="form-group">
+              <label>Number of Blocks</label>
+              <input type="number" id="mineBlockCount" value="1" min="1" max="1000">
+            </div>
+            <div class="form-group">
+              <label>To Address (optional)</label>
+              <input type="text" id="mineToAddress" placeholder="Leave empty for wallet address">
+            </div>
+            <button class="btn btn-primary" onclick="mineBlocksFromForm()">Mine</button>
+          </div>
+          <div id="mineResult" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+          <h2>Mining Info</h2>
+          <div id="miningInfo">
+            <div class="empty-state">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wallet Tab -->
+    <div class="tab-content" id="tab-wallet">
+      <div class="grid-2">
+        <div class="card">
+          <h2>Send Bitcoin</h2>
+          <div class="form-group">
+            <label>Recipient Address</label>
+            <input type="text" id="sendAddress" placeholder="bcrt1...">
+          </div>
+          <div class="form-group">
+            <label>Amount (BTC)</label>
+            <input type="number" id="sendAmount" step="0.00000001" placeholder="0.1">
+          </div>
+          <div class="checkbox-group">
+            <input type="checkbox" id="sendReplaceable" checked>
+            <label for="sendReplaceable">RBF Enabled (allows fee bumping)</label>
+          </div>
+          <button class="btn btn-primary" onclick="sendBitcoin()">Send</button>
+          <div id="sendResult" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+          <h2>Generate Address</h2>
+          <div class="form-group">
+            <label>Address Type</label>
+            <select id="addressType">
+              <option value="bech32">Bech32 (bc1...)</option>
+              <option value="bech32m">Bech32m (Taproot)</option>
+              <option value="p2sh-segwit">P2SH-SegWit (3...)</option>
+              <option value="legacy">Legacy (1...)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Label (optional)</label>
+            <input type="text" id="addressLabel" placeholder="My address">
+          </div>
+          <button class="btn btn-primary" onclick="generateAddress()">Generate</button>
+          <div id="addressResult" class="result-box" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Wallet Balance</h2>
+        <div id="walletInfo">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>UTXOs</h2>
+        <div id="utxoList">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transactions Tab -->
+    <div class="tab-content" id="tab-transactions">
+      <div class="card">
+        <h2>RBF - Bump Fee</h2>
+        <div class="inline-form">
+          <div class="form-group" style="flex: 2;">
+            <label>Transaction ID</label>
+            <input type="text" id="bumpFeeTxid" placeholder="Enter txid of unconfirmed transaction">
+          </div>
+          <button class="btn btn-primary" onclick="bumpFee()">Bump Fee</button>
+          <button class="btn btn-danger" onclick="cancelTransaction()">Cancel TX</button>
+        </div>
+        <div id="rbfResult" class="result-box" style="display:none;"></div>
+      </div>
+
+      <div class="card">
+        <h2>Lookup Transaction</h2>
+        <div class="inline-form">
+          <div class="form-group" style="flex: 2;">
+            <label>Transaction ID</label>
+            <input type="text" id="lookupTxid" placeholder="Enter txid">
+          </div>
+          <button class="btn btn-primary" onclick="lookupTransaction()">Lookup</button>
+        </div>
+        <div id="txLookupResult" class="result-box" style="display:none;"></div>
+      </div>
+
+      <div class="card">
+        <h2>Recent Transactions</h2>
+        <div id="recentTransactions">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mempool Tab -->
+    <div class="tab-content" id="tab-mempool">
+      <div class="card">
+        <h2>Mempool Info</h2>
+        <div id="mempoolInfo">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Mempool Transactions</h2>
+        <button class="btn btn-secondary" onclick="loadMempoolTxs()" style="margin-bottom: 16px;">Refresh</button>
+        <div id="mempoolTxs">
+          <div class="empty-state">Click refresh to load</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blocks Tab -->
+    <div class="tab-content" id="tab-blocks">
+      <div class="card">
+        <h2>Block Lookup</h2>
+        <div class="inline-form">
+          <div class="form-group">
+            <label>Block Height or Hash</label>
+            <input type="text" id="blockLookup" placeholder="Enter height or hash">
+          </div>
+          <button class="btn btn-primary" onclick="lookupBlock()">Lookup</button>
+        </div>
+        <div id="blockLookupResult" class="result-box" style="display:none;"></div>
+      </div>
+
+      <div class="card">
+        <h2>Recent Blocks</h2>
+        <div id="recentBlocks">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Raw TX Tab -->
+    <div class="tab-content" id="tab-raw">
+      <div class="grid-2">
+        <div class="card">
+          <h2>Decode Raw Transaction</h2>
+          <div class="form-group">
+            <label>Raw Transaction Hex</label>
+            <textarea id="decodeRawTx" placeholder="Enter raw transaction hex..."></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="decodeRawTx()">Decode</button>
+          <div id="decodeResult" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+          <h2>Broadcast Raw Transaction</h2>
+          <div class="form-group">
+            <label>Signed Raw Transaction Hex</label>
+            <textarea id="broadcastRawTx" placeholder="Enter signed raw transaction hex..."></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="broadcastRawTx()">Broadcast</button>
+          <div id="broadcastResult" class="result-box" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Test Mempool Accept</h2>
+        <div class="form-group">
+          <label>Raw Transaction Hex (to test without broadcasting)</label>
+          <textarea id="testMempoolTx" placeholder="Enter raw transaction hex..."></textarea>
+        </div>
+        <button class="btn btn-secondary" onclick="testMempoolAccept()">Test Accept</button>
+        <div id="testMempoolResult" class="result-box" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- RPC Console Tab -->
+    <div class="tab-content" id="tab-rpc">
+      <div class="card">
+        <h2>RPC Console</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">Execute any Bitcoin Core RPC command directly.</p>
+        <div class="form-group">
+          <label>RPC Method</label>
+          <input type="text" id="rpcMethod" placeholder="e.g., getblockchaininfo">
+        </div>
+        <div class="form-group">
+          <label>Parameters (JSON array, optional)</label>
+          <textarea id="rpcParams" placeholder='e.g., ["bcrt1...", 0.1] or leave empty'></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="executeRPC()">Execute</button>
+        <div id="rpcResult" class="result-box" style="display:none;"></div>
+      </div>
+
+      <div class="card">
+        <h2>Common RPC Commands</h2>
+        <div class="btn-group" style="flex-wrap: wrap;">
+          <button class="btn btn-secondary" onclick="quickRPC('getblockchaininfo')">getblockchaininfo</button>
+          <button class="btn btn-secondary" onclick="quickRPC('getnetworkinfo')">getnetworkinfo</button>
+          <button class="btn btn-secondary" onclick="quickRPC('getmininginfo')">getmininginfo</button>
+          <button class="btn btn-secondary" onclick="quickRPC('getmempoolinfo')">getmempoolinfo</button>
+          <button class="btn btn-secondary" onclick="quickRPC('getwalletinfo')">getwalletinfo</button>
+          <button class="btn btn-secondary" onclick="quickRPC('listwallets')">listwallets</button>
+          <button class="btn btn-secondary" onclick="quickRPC('getpeerinfo')">getpeerinfo</button>
+          <button class="btn btn-secondary" onclick="quickRPC('uptime')">uptime</button>
+        </div>
+      </div>
+
+      <div class="card" style="border-color: var(--accent-red);">
+        <h2 style="color: var(--accent-red);">Danger Zone</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          These actions are destructive and cannot be easily undone. Use with caution.
+        </p>
+
+        <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start;">
+          <div style="flex: 1; min-width: 250px;">
+            <h4 style="margin-bottom: 8px; font-size: 0.95rem;">Reset Chain</h4>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px;">
+              Invalidate all blocks and reset to genesis (block 0). Your wallet balance will be lost.
+            </p>
+            <button class="btn btn-danger" onclick="showResetConfirm()">Reset Chain to Genesis</button>
+          </div>
+
+          <div style="flex: 1; min-width: 250px;">
+            <h4 style="margin-bottom: 8px; font-size: 0.95rem;">Restore Chain</h4>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px;">
+              Reconsider invalidated blocks and restore the chain to its previous state.
+            </p>
+            <button class="btn btn-secondary" onclick="reconsiderChain()">Restore Invalidated Blocks</button>
+          </div>
+        </div>
+
+        <div id="resetResult" class="result-box" style="display:none; margin-top: 16px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset Confirmation Modal -->
+  <div id="resetModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;">
+    <div style="background: var(--bg-secondary); border: 1px solid var(--accent-red); border-radius: 12px; padding: 24px; max-width: 450px; margin: 20px;">
+      <h3 style="color: var(--accent-red); margin-bottom: 16px;">Confirm Chain Reset</h3>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">
+        This will invalidate ALL blocks and reset the chain to block 0.
+        <strong style="color: var(--text-primary);">Your entire wallet balance will be lost.</strong>
+      </p>
+      <p style="color: var(--text-secondary); margin-bottom: 20px;">
+        Type <strong style="color: var(--accent-red);">RESET</strong> below to confirm:
+      </p>
+      <input type="text" id="resetConfirmInput" placeholder="Type RESET to confirm" style="width: 100%; padding: 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); margin-bottom: 20px; font-size: 1rem;">
+      <div style="display: flex; gap: 12px;">
+        <button class="btn btn-secondary" onclick="hideResetModal()" style="flex: 1;">Cancel</button>
+        <button class="btn btn-danger" onclick="executeReset()" style="flex: 1;">Reset Chain</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '/api';
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    // API helper
+    async function api(endpoint, options = {}) {
+      try {
+        const response = await fetch(API_BASE + endpoint, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+          }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Request failed');
+        return data;
+      } catch (error) {
+        throw error;
+      }
+    }
+
+    // Display result in a box
+    function showResult(elementId, data, isError = false) {
+      const el = document.getElementById(elementId);
+      el.style.display = 'block';
+      el.className = 'result-box ' + (isError ? 'error' : 'success');
+      el.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    }
+
+    // Update connection status
+    async function checkConnection() {
+      try {
+        const health = await api('/health');
+        document.getElementById('statusDot').classList.add('connected');
+        document.getElementById('statusText').textContent = `Connected (${health.chain})`;
+        return true;
+      } catch (error) {
+        document.getElementById('statusDot').classList.remove('connected');
+        document.getElementById('statusText').textContent = 'Disconnected';
+        return false;
+      }
+    }
+
+    // Refresh stats
+    async function refreshStats() {
+      try {
+        const [blockchain, balance, mempool] = await Promise.all([
+          api('/blockchain/info'),
+          api('/wallet/balance').catch(() => ({ confirmed: 0 })),
+          api('/mempool/info')
+        ]);
+
+        document.getElementById('blockHeight').textContent = blockchain.blocks.toLocaleString();
+        // Format balance: show fewer decimals for large amounts
+        const bal = balance.confirmed;
+        let balanceText;
+        if (bal >= 1000) {
+          balanceText = bal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' BTC';
+        } else if (bal >= 1) {
+          balanceText = bal.toFixed(4) + ' BTC';
+        } else {
+          balanceText = bal.toFixed(8) + ' BTC';
+        }
+        document.getElementById('walletBalance').textContent = balanceText;
+        document.getElementById('mempoolSize').textContent = mempool.size;
+        document.getElementById('networkName').textContent = blockchain.chain;
+      } catch (error) {
+        console.error('Failed to refresh stats:', error);
+      }
+    }
+
+    // Mine blocks
+    async function mineBlocks(count, address = null) {
+      try {
+        const result = await api('/mine', {
+          method: 'POST',
+          body: JSON.stringify({ blocks: count, address: address })
+        });
+        showResult('mineResult', result);
+        refreshStats();
+        loadMiningInfo();
+        loadRecentBlocks();
+        return result;
+      } catch (error) {
+        showResult('mineResult', error.message, true);
+      }
+    }
+
+    function mineBlocksFromForm() {
+      const count = document.getElementById('mineBlockCount').value;
+      const address = document.getElementById('mineToAddress').value || null;
+      mineBlocks(parseInt(count), address);
+    }
+
+    // Generate new address
+    // Copy to clipboard helper (works on HTTP)
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+      } else {
+        fallbackCopy(text);
+      }
+    }
+
+    function fallbackCopy(text) {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (e) {
+        console.log('Copy failed:', e);
+      }
+      document.body.removeChild(textArea);
+    }
+
+    async function generateNewAddress() {
+      try {
+        const result = await api('/wallet/newaddress', {
+          method: 'POST',
+          body: JSON.stringify({ addressType: 'bech32' })
+        });
+        copyToClipboard(result.address);
+        alert('New Address (copied to clipboard):\n\n' + result.address);
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    async function generateAddress() {
+      try {
+        const addressType = document.getElementById('addressType').value;
+        const label = document.getElementById('addressLabel').value;
+        const result = await api('/wallet/newaddress', {
+          method: 'POST',
+          body: JSON.stringify({ addressType, label })
+        });
+        showResult('addressResult', result);
+      } catch (error) {
+        showResult('addressResult', error.message, true);
+      }
+    }
+
+    // Send Bitcoin
+    async function sendBitcoin() {
+      try {
+        const address = document.getElementById('sendAddress').value;
+        const amount = document.getElementById('sendAmount').value;
+        const replaceable = document.getElementById('sendReplaceable').checked;
+
+        if (!address || !amount) {
+          showResult('sendResult', 'Please enter address and amount', true);
+          return;
+        }
+
+        const result = await api('/wallet/send', {
+          method: 'POST',
+          body: JSON.stringify({ address, amount: parseFloat(amount), replaceable })
+        });
+        showResult('sendResult', result);
+        refreshStats();
+      } catch (error) {
+        showResult('sendResult', error.message, true);
+      }
+    }
+
+    // RBF - Bump fee
+    async function bumpFee() {
+      try {
+        const txid = document.getElementById('bumpFeeTxid').value;
+        if (!txid) {
+          showResult('rbfResult', 'Please enter a transaction ID', true);
+          return;
+        }
+        const result = await api('/transaction/bumpfee', {
+          method: 'POST',
+          body: JSON.stringify({ txid })
+        });
+        showResult('rbfResult', result);
+      } catch (error) {
+        showResult('rbfResult', error.message, true);
+      }
+    }
+
+    // Cancel transaction
+    async function cancelTransaction() {
+      try {
+        const txid = document.getElementById('bumpFeeTxid').value;
+        if (!txid) {
+          showResult('rbfResult', 'Please enter a transaction ID', true);
+          return;
+        }
+        const result = await api('/transaction/cancel', {
+          method: 'POST',
+          body: JSON.stringify({ txid })
+        });
+        showResult('rbfResult', result);
+      } catch (error) {
+        showResult('rbfResult', error.message, true);
+      }
+    }
+
+    // Lookup transaction
+    async function lookupTransaction() {
+      try {
+        const txid = document.getElementById('lookupTxid').value;
+        if (!txid) {
+          showResult('txLookupResult', 'Please enter a transaction ID', true);
+          return;
+        }
+        const result = await api('/transaction/' + txid);
+        showResult('txLookupResult', result);
+      } catch (error) {
+        showResult('txLookupResult', error.message, true);
+      }
+    }
+
+    // Load recent transactions
+    async function loadRecentTransactions() {
+      try {
+        const transactions = await api('/wallet/transactions?count=20');
+        const container = document.getElementById('recentTransactions');
+
+        if (!transactions.length) {
+          container.innerHTML = '<div class="empty-state">No transactions yet</div>';
+          return;
+        }
+
+        container.innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>TXID</th>
+                <th>Amount</th>
+                <th>Confirmations</th>
+                <th>Category</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${transactions.reverse().map(tx => `
+                <tr>
+                  <td class="truncate" title="${tx.txid}">${tx.txid}</td>
+                  <td>${tx.amount > 0 ? '+' : ''}${tx.amount.toFixed(8)} BTC</td>
+                  <td>${tx.confirmations}</td>
+                  <td><span class="badge ${tx.category === 'receive' ? 'badge-success' : 'badge-warning'}">${tx.category}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (error) {
+        document.getElementById('recentTransactions').innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+      }
+    }
+
+    // Load UTXOs
+    async function loadUTXOs() {
+      try {
+        const utxos = await api('/wallet/utxos');
+        const container = document.getElementById('utxoList');
+
+        if (!utxos.length) {
+          container.innerHTML = '<div class="empty-state">No UTXOs available</div>';
+          return;
+        }
+
+        container.innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>TXID:Vout</th>
+                <th>Amount</th>
+                <th>Confirmations</th>
+                <th>Address</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${utxos.map(utxo => `
+                <tr>
+                  <td class="truncate" title="${utxo.txid}:${utxo.vout}">${utxo.txid.substring(0, 16)}...:${utxo.vout}</td>
+                  <td>${utxo.amount.toFixed(8)} BTC</td>
+                  <td>${utxo.confirmations}</td>
+                  <td class="truncate" title="${utxo.address}">${utxo.address}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (error) {
+        document.getElementById('utxoList').innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+      }
+    }
+
+    // Load wallet info
+    async function loadWalletInfo() {
+      try {
+        const [balance, info] = await Promise.all([
+          api('/wallet/balance'),
+          api('/wallet/info').catch(() => null)
+        ]);
+
+        document.getElementById('walletInfo').innerHTML = `
+          <div class="stats-grid" style="margin: 0;">
+            <div class="stat-card">
+              <h3>Confirmed</h3>
+              <div class="value">${balance.confirmed.toFixed(8)}</div>
+            </div>
+            <div class="stat-card">
+              <h3>Unconfirmed</h3>
+              <div class="value">${balance.unconfirmed.toFixed(8)}</div>
+            </div>
+            ${info ? `
+              <div class="stat-card">
+                <h3>TX Count</h3>
+                <div class="value">${info.txcount || 0}</div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      } catch (error) {
+        document.getElementById('walletInfo').innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+      }
+    }
+
+    // Load mempool info
+    async function loadMempoolInfo() {
+      try {
+        const info = await api('/mempool/info');
+        document.getElementById('mempoolInfo').innerHTML = `
+          <div class="stats-grid" style="margin: 0;">
+            <div class="stat-card">
+              <h3>Size</h3>
+              <div class="value">${info.size}</div>
+            </div>
+            <div class="stat-card">
+              <h3>Bytes</h3>
+              <div class="value">${(info.bytes / 1024).toFixed(2)} KB</div>
+            </div>
+            <div class="stat-card">
+              <h3>Max Mempool</h3>
+              <div class="value">${(info.maxmempool / 1024 / 1024).toFixed(0)} MB</div>
+            </div>
+            <div class="stat-card">
+              <h3>Min Fee</h3>
+              <div class="value">${info.mempoolminfee}</div>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        document.getElementById('mempoolInfo').innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+      }
+    }
+
+    // Load mempool transactions
+    async function loadMempoolTxs() {
+      try {
+        const txs = await api('/mempool/raw?verbose=true');
+        const container = document.getElementById('mempoolTxs');
+        const txids = Object.keys(txs);
+
+        if (!txids.length) {
+          container.innerHTML = '<div class="empty-state">Mempool is empty</div>';
+          return;
+        }
+
+        container.innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>TXID</th>
+                <th>Size</th>
+                <th>Fee</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${txids.slice(0, 50).map(txid => {
+                const tx = txs[txid];
+                return `
+                  <tr>
+                    <td class="truncate" title="${txid}">${txid}</td>
+                    <td>${tx.vsize} vB</td>
+                    <td>${(tx.fees.base * 100000000).toFixed(0)} sat</td>
+                    <td>${new Date(tx.time * 1000).toLocaleTimeString()}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+          ${txids.length > 50 ? `<p style="color: var(--text-secondary); margin-top: 16px;">Showing 50 of ${txids.length} transactions</p>` : ''}
+        `;
+      } catch (error) {
+        document.getElementById('mempoolTxs').innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+      }
+    }
+
+    // Lookup block
+    async function lookupBlock() {
+      try {
+        const input = document.getElementById('blockLookup').value;
+        if (!input) {
+          showResult('blockLookupResult', 'Please enter a block height or hash', true);
+          return;
+        }
+
+        let result;
+        if (/^\d+$/.test(input)) {
+          result = await api('/block/height/' + input);
+        } else {
+          result = await api('/block/' + input);
+        }
+        showResult('blockLookupResult', result);
+      } catch (error) {
+        showResult('blockLookupResult', error.message, true);
+      }
+    }
+
+    // Load recent blocks
+    async function loadRecentBlocks() {
+      try {
+        const blockchain = await api('/blockchain/info');
+        const blocks = [];
+
+        for (let i = blockchain.blocks; i >= Math.max(0, blockchain.blocks - 9); i--) {
+          try {
+            const block = await api('/block/height/' + i);
+            blocks.push(block);
+          } catch (e) {
+            break;
+          }
+        }
+
+        const container = document.getElementById('recentBlocks');
+        container.innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>Height</th>
+                <th>Hash</th>
+                <th>TXs</th>
+                <th>Size</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${blocks.map(block => `
+                <tr>
+                  <td>${block.height}</td>
+                  <td class="truncate" title="${block.hash}">${block.hash}</td>
+                  <td>${block.nTx}</td>
+                  <td>${(block.size / 1024).toFixed(2)} KB</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (error) {
+        document.getElementById('recentBlocks').innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+      }
+    }
+
+    // Load mining info
+    // Format difficulty for display
+    function formatDifficulty(diff) {
+      if (diff < 0.0001) {
+        return diff.toExponential(2);
+      } else if (diff < 1) {
+        return diff.toFixed(8);
+      } else {
+        return diff.toLocaleString();
+      }
+    }
+
+    async function loadMiningInfo() {
+      try {
+        const info = await api('/mining/info');
+        document.getElementById('miningInfo').innerHTML = `
+          <div class="stats-grid" style="margin: 0;">
+            <div class="stat-card">
+              <h3>Blocks</h3>
+              <div class="value">${info.blocks}</div>
+            </div>
+            <div class="stat-card">
+              <h3>Difficulty</h3>
+              <div class="value" title="${info.difficulty}">${formatDifficulty(info.difficulty)}</div>
+            </div>
+            <div class="stat-card">
+              <h3>Network Hash/s</h3>
+              <div class="value">${info.networkhashps.toFixed(2)}</div>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        document.getElementById('miningInfo').innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+      }
+    }
+
+    // Decode raw transaction
+    async function decodeRawTx() {
+      try {
+        const hex = document.getElementById('decodeRawTx').value;
+        if (!hex) {
+          showResult('decodeResult', 'Please enter raw transaction hex', true);
+          return;
+        }
+        const result = await api('/transaction/decode', {
+          method: 'POST',
+          body: JSON.stringify({ hex })
+        });
+        showResult('decodeResult', result);
+      } catch (error) {
+        showResult('decodeResult', error.message, true);
+      }
+    }
+
+    // Broadcast raw transaction
+    async function broadcastRawTx() {
+      try {
+        const hex = document.getElementById('broadcastRawTx').value;
+        if (!hex) {
+          showResult('broadcastResult', 'Please enter raw transaction hex', true);
+          return;
+        }
+        const result = await api('/transaction/send', {
+          method: 'POST',
+          body: JSON.stringify({ hex })
+        });
+        showResult('broadcastResult', result);
+        refreshStats();
+      } catch (error) {
+        showResult('broadcastResult', error.message, true);
+      }
+    }
+
+    // Test mempool accept
+    async function testMempoolAccept() {
+      try {
+        const hex = document.getElementById('testMempoolTx').value;
+        if (!hex) {
+          showResult('testMempoolResult', 'Please enter raw transaction hex', true);
+          return;
+        }
+        const result = await api('/transaction/testmempoolaccept', {
+          method: 'POST',
+          body: JSON.stringify({ rawtxs: [hex] })
+        });
+        showResult('testMempoolResult', result);
+      } catch (error) {
+        showResult('testMempoolResult', error.message, true);
+      }
+    }
+
+    // RPC Console
+    async function executeRPC() {
+      try {
+        const method = document.getElementById('rpcMethod').value;
+        if (!method) {
+          showResult('rpcResult', 'Please enter an RPC method', true);
+          return;
+        }
+
+        let params = [];
+        const paramsStr = document.getElementById('rpcParams').value.trim();
+        if (paramsStr) {
+          try {
+            params = JSON.parse(paramsStr);
+          } catch (e) {
+            showResult('rpcResult', 'Invalid JSON in parameters', true);
+            return;
+          }
+        }
+
+        const result = await api('/rpc', {
+          method: 'POST',
+          body: JSON.stringify({ method, params })
+        });
+        showResult('rpcResult', result);
+      } catch (error) {
+        showResult('rpcResult', error.message, true);
+      }
+    }
+
+    async function quickRPC(method) {
+      document.getElementById('rpcMethod').value = method;
+      document.getElementById('rpcParams').value = '';
+      await executeRPC();
+    }
+
+    // Refresh all data
+    async function refreshAll() {
+      await checkConnection();
+      await refreshStats();
+      loadMiningInfo();
+      loadWalletInfo();
+      loadUTXOs();
+      loadRecentTransactions();
+      loadMempoolInfo();
+      loadRecentBlocks();
+    }
+
+    // Theme Management
+    const defaultTheme = {
+      accent: '#f7931a',
+      bg: '#0d1117',
+      card: '#161b22',
+      text: '#f0f6fc'
+    };
+
+    const presets = {
+      bitcoin: { accent: '#f7931a', bg: '#0d1117', card: '#161b22', text: '#f0f6fc' },
+      green: { accent: '#22c55e', bg: '#0a0f0a', card: '#111a11', text: '#f0f6fc' },
+      blue: { accent: '#3b82f6', bg: '#0a0f17', card: '#111827', text: '#f0f6fc' },
+      purple: { accent: '#a855f7', bg: '#0f0a17', card: '#1a1127', text: '#f0f6fc' },
+      red: { accent: '#ef4444', bg: '#170a0a', card: '#271111', text: '#f0f6fc' },
+      pink: { accent: '#ec4899', bg: '#170a11', card: '#27111a', text: '#f0f6fc' },
+      teal: { accent: '#14b8a6', bg: '#0a1717', card: '#112222', text: '#f0f6fc' },
+      yellow: { accent: '#eab308', bg: '#17150a', card: '#222011', text: '#f0f6fc' }
+    };
+
+    function toggleThemePanel() {
+      document.getElementById('themePanel').classList.toggle('open');
+      document.getElementById('themePanelOverlay').classList.toggle('open');
+    }
+
+    function updateColor(type, value) {
+      const root = document.documentElement;
+
+      switch(type) {
+        case 'accent':
+          root.style.setProperty('--accent-orange', value);
+          document.getElementById('accentColorText').value = value;
+          document.getElementById('accentColor').value = value;
+          break;
+        case 'bg':
+          root.style.setProperty('--bg-primary', value);
+          document.getElementById('bgColorText').value = value;
+          document.getElementById('bgColor').value = value;
+          // Also update tertiary bg
+          root.style.setProperty('--bg-tertiary', adjustColor(value, 20));
+          root.style.setProperty('--border-color', adjustColor(value, 35));
+          break;
+        case 'card':
+          root.style.setProperty('--bg-secondary', value);
+          document.getElementById('cardColorText').value = value;
+          document.getElementById('cardColor').value = value;
+          break;
+        case 'text':
+          root.style.setProperty('--text-primary', value);
+          root.style.setProperty('--text-secondary', adjustColor(value, -40));
+          document.getElementById('textColorText').value = value;
+          document.getElementById('textColor').value = value;
+          break;
+      }
+
+      saveTheme();
+    }
+
+    function updateColorFromText(type, value) {
+      if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+        updateColor(type, value);
+      }
+    }
+
+    function adjustColor(hex, amount) {
+      const num = parseInt(hex.slice(1), 16);
+      const r = Math.min(255, Math.max(0, (num >> 16) + amount));
+      const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amount));
+      const b = Math.min(255, Math.max(0, (num & 0x0000FF) + amount));
+      return '#' + (0x1000000 + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+
+    function applyPreset(name) {
+      const preset = presets[name];
+      if (preset) {
+        updateColor('accent', preset.accent);
+        updateColor('bg', preset.bg);
+        updateColor('card', preset.card);
+        updateColor('text', preset.text);
+      }
+    }
+
+    function saveTheme() {
+      const theme = {
+        accent: document.getElementById('accentColor').value,
+        bg: document.getElementById('bgColor').value,
+        card: document.getElementById('cardColor').value,
+        text: document.getElementById('textColor').value
+      };
+      localStorage.setItem('dashboardTheme', JSON.stringify(theme));
+    }
+
+    function loadTheme() {
+      const saved = localStorage.getItem('dashboardTheme');
+      if (saved) {
+        try {
+          const theme = JSON.parse(saved);
+          updateColor('accent', theme.accent);
+          updateColor('bg', theme.bg);
+          updateColor('card', theme.card);
+          updateColor('text', theme.text);
+        } catch (e) {
+          console.log('Failed to load theme:', e);
+        }
+      }
+    }
+
+    function resetTheme() {
+      localStorage.removeItem('dashboardTheme');
+      updateColor('accent', defaultTheme.accent);
+      updateColor('bg', defaultTheme.bg);
+      updateColor('card', defaultTheme.card);
+      updateColor('text', defaultTheme.text);
+    }
+
+    // Chain Reset Functions
+    function showResetConfirm() {
+      document.getElementById('resetModal').style.display = 'flex';
+      document.getElementById('resetConfirmInput').value = '';
+      document.getElementById('resetConfirmInput').focus();
+    }
+
+    function hideResetModal() {
+      document.getElementById('resetModal').style.display = 'none';
+    }
+
+    async function executeReset() {
+      const confirmValue = document.getElementById('resetConfirmInput').value;
+
+      if (confirmValue !== 'RESET') {
+        alert('Please type RESET to confirm.');
+        return;
+      }
+
+      hideResetModal();
+
+      try {
+        const result = await api('/chain/reset', {
+          method: 'POST',
+          body: JSON.stringify({ confirm: 'RESET' })
+        });
+
+        showResult('resetResult', result);
+
+        // Refresh all stats
+        setTimeout(() => {
+          refreshAll();
+        }, 1000);
+
+      } catch (error) {
+        showResult('resetResult', error.message, true);
+      }
+    }
+
+    async function reconsiderChain() {
+      if (!confirm('This will restore any previously invalidated blocks. Continue?')) {
+        return;
+      }
+
+      try {
+        const result = await api('/chain/reconsider', {
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+
+        showResult('resetResult', result);
+
+        // Refresh all stats
+        setTimeout(() => {
+          refreshAll();
+        }, 1000);
+
+      } catch (error) {
+        showResult('resetResult', error.message, true);
+      }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      loadTheme();
+      refreshAll();
+      // Auto-refresh every 10 seconds
+      setInterval(refreshStats, 10000);
+      setInterval(checkConnection, 30000);
+    });
+  </script>
+</body>
+</html>
