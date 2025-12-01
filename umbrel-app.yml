@@ -35,14 +35,14 @@ description: >-
 
   Perfect for Bitcoin developers who need quick access to regtest node functionality
   for testing wallets, applications, and Bitcoin integrations.
-developer: Bitcoin Regtest Dashboard
-website: https://github.com/example/bitcoin-regtest-dashboard
-submitter: Developer
-submission: https://github.com/example/bitcoin-regtest-dashboard
-repo: https://github.com/example/bitcoin-regtest-dashboard
-support: https://github.com/example/bitcoin-regtest-dashboard/issues
+developer: Corey Phillips
+website: https://github.com/coreyphillips/bitcoin-regtest-dashboard
+submitter: Corey Phillips
+submission: https://github.com/coreyphillips/bitcoin-regtest-dashboard
+repo: https://github.com/coreyphillips/bitcoin-regtest-dashboard
+support: https://github.com/coreyphillips/bitcoin-regtest-dashboard/issues
 gallery:
-  - https://raw.githubusercontent.com/example/bitcoin-regtest-dashboard/main/gallery/screenshot1.png
+  - https://raw.githubusercontent.com/coreyphillips/bitcoin-regtest-dashboard/main/gallery/screenshot1.png
 releaseNotes: >-
   Initial release with full regtest node interaction capabilities.
 dependencies:
