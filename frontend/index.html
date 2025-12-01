@@ -1131,6 +1131,8 @@
         refreshStats();
         loadMiningInfo();
         loadRecentBlocks();
+        loadRecentTransactions();
+        loadUTXOs();
         return result;
       } catch (error) {
         showResult('mineResult', error.message, true);
@@ -1213,6 +1215,9 @@
         });
         showResult('sendResult', result);
         refreshStats();
+        loadRecentTransactions();
+        loadUTXOs();
+        loadMempoolInfo();
       } catch (error) {
         showResult('sendResult', error.message, true);
       }
