@@ -103,6 +103,10 @@ sudo reboot
 To connect to an existing Bitcoin Core node instead of the bundled one:
 
 ```bash
+# First, build the image
+docker build -t bitcoin-regtest-dashboard .
+
+# Run with external node
 docker run -d \
   --name bitcoin-regtest-dashboard \
   -p 3000:3000 \
@@ -112,6 +116,8 @@ docker run -d \
   -e BITCOIN_RPC_PASS=your_pass \
   bitcoin-regtest-dashboard:latest
 ```
+
+**Note:** When running standalone without Electrs, the Address Explorer and Electrs-powered features will not be available. For full functionality, use the docker-compose setup.
 
 Your external Bitcoin Core `bitcoin.conf` should include:
 
