@@ -2,6 +2,8 @@
 
 A self-contained development tool for interacting with Bitcoin Core in regtest mode. Includes its own Bitcoin Core node and Electrs (Electrum Server) instance - no external dependencies required.
 
+![Bitcoin Regtest Dashboard](gallery/screenshot1.png)
+
 ## Features
 
 - **Self-Contained**: Spins up its own Bitcoin Core regtest node and Electrs instance
