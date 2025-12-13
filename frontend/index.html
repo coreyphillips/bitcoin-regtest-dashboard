@@ -1128,27 +1128,6 @@
         </div>
       </div>
 
-      <div class="card">
-        <h2>Compatible Wallets</h2>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-          <div style="padding: 16px; background: var(--bg-primary); border-radius: 8px;">
-            <strong>Electrum</strong>
-            <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px;">Desktop wallet</div>
-          </div>
-          <div style="padding: 16px; background: var(--bg-primary); border-radius: 8px;">
-            <strong>Sparrow</strong>
-            <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px;">Desktop wallet</div>
-          </div>
-          <div style="padding: 16px; background: var(--bg-primary); border-radius: 8px;">
-            <strong>BlueWallet</strong>
-            <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px;">Mobile wallet</div>
-          </div>
-          <div style="padding: 16px; background: var(--bg-primary); border-radius: 8px;">
-            <strong>Wasabi</strong>
-            <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px;">Privacy wallet</div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Raw TX Tab -->
@@ -1265,6 +1244,7 @@
     </div>
   </div>
 
+  <script src="qrcode.min.js"></script>
   <script>
     const API_BASE = '/api';
     let currentNetwork = 'unknown';
@@ -1364,6 +1344,10 @@
         const info = await api('/electrs/info');
         const electrsInfoEl = document.getElementById('electrsInfo');
         if (electrsInfoEl) {
+          // Connection string in Umbrel format: host:port:t (TCP) or host:port:s (SSL)
+          const protocolSuffix = info.protocol === 'ssl' ? 's' : 't';
+          const connectionString = `${info.host}:${info.port}:${protocolSuffix}`;
+
           electrsInfoEl.innerHTML = `
             <div class="stats-grid" style="margin: 0;">
               <div class="stat-card">
@@ -1387,13 +1371,26 @@
                 <div class="value" style="font-size: 1rem;">${info.network}</div>
               </div>
             </div>
-            <div style="margin-top: 16px; padding: 12px; background: var(--bg-primary); border-radius: 8px;">
-              <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Connect with Electrum:</div>
-              <code style="font-size: 0.85rem; word-break: break-all; display: block; padding: 8px; background: var(--bg-tertiary); border-radius: 4px;">
-                electrum --regtest --oneserver --server ${info.host}:${info.port}:t
-              </code>
+            <div style="margin-top: 16px; padding: 16px; background: var(--bg-primary); border-radius: 8px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+              <div id="electrsQrCode" style="background: white; padding: 8px; border-radius: 8px; display: inline-block;"></div>
+              <div style="flex: 1; min-width: 200px;">
+                <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Connection String (Umbrel format):</div>
+                <code style="font-size: 1rem; word-break: break-all; display: block; padding: 8px; background: var(--bg-tertiary); border-radius: 4px;">
+                  ${connectionString}
+                </code>
+                <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 12px; margin-bottom: 8px;">Connect with Electrum CLI:</div>
+                <code style="font-size: 0.85rem; word-break: break-all; display: block; padding: 8px; background: var(--bg-tertiary); border-radius: 4px;">
+                  electrum --regtest --oneserver --server ${connectionString}
+                </code>
+              </div>
             </div>
           `;
+
+          // Generate QR code
+          const qr = qrcode(0, 'M');
+          qr.addData(connectionString);
+          qr.make();
+          document.getElementById('electrsQrCode').innerHTML = qr.createSvgTag(4);
         }
       } catch (error) {
         console.error('Failed to load electrs info:', error);
