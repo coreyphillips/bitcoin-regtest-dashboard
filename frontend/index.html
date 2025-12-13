@@ -680,9 +680,13 @@
         <h1>Regtest <span>Dashboard</span></h1>
       </div>
       <div style="display: flex; align-items: center; gap: 12px;">
-        <div class="status-indicator">
+        <div class="status-indicator" title="Bitcoin Core">
           <div class="status-dot" id="statusDot"></div>
           <span id="statusText">Connecting...</span>
+        </div>
+        <div class="status-indicator" title="Electrs">
+          <div class="status-dot" id="electrsStatusDot"></div>
+          <span id="electrsStatusText">Electrs...</span>
         </div>
         <button class="settings-btn" onclick="toggleThemePanel()" title="Theme Settings">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -760,8 +764,8 @@
       </div>
 
       <div class="theme-actions">
-        <button class="btn btn-secondary" onclick="resetTheme()">Reset</button>
-        <button class="btn btn-primary" onclick="toggleThemePanel()">Done</button>
+        <button class="btn btn-secondary" id="themeResetBtn" onclick="resetTheme()">Reset</button>
+        <button class="btn btn-primary" id="themeDoneBtn" onclick="toggleThemePanel()">Done</button>
       </div>
     </div>
 
@@ -819,6 +823,8 @@
       <button class="tab" data-tab="transactions">Transactions</button>
       <button class="tab" data-tab="mempool">Mempool</button>
       <button class="tab" data-tab="blocks">Blocks</button>
+      <button class="tab" data-tab="explorer">Explorer</button>
+      <button class="tab" data-tab="electrs">Electrs</button>
       <button class="tab" data-tab="raw">Raw TX</button>
       <button class="tab" data-tab="rpc">RPC Console</button>
     </div>
@@ -978,6 +984,169 @@
         <h2>Recent Blocks</h2>
         <div id="recentBlocks">
           <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Explorer Tab -->
+    <div class="tab-content" id="tab-explorer">
+      <div class="card">
+        <h2>
+          <svg fill="currentColor" viewBox="0 0 24 24" style="width: 24px; height: 24px;">
+            <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 0 0 1.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 0 0-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 0 0 5.34-1.48l.27.28v.79l4.25 4.25c.41.41 1.08.41 1.49 0 .41-.41.41-1.08 0-1.49L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          </svg>
+          Address & Transaction Explorer
+        </h2>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Search for any Bitcoin address or transaction ID to view detailed information.
+        </p>
+        <div class="inline-form">
+          <div class="form-group" style="flex: 3;">
+            <label>Address or Transaction ID</label>
+            <input type="text" id="explorerSearch" placeholder="Enter address (bcrt1..., 1..., 3...) or txid">
+          </div>
+          <button class="btn btn-primary" onclick="explorerLookup()">
+            <svg fill="currentColor" viewBox="0 0 24 24" style="width: 18px; height: 18px;">
+              <path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 0 0 1.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 0 0-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 0 0 5.34-1.48l.27.28v.79l4.25 4.25c.41.41 1.08.41 1.49 0 .41-.41.41-1.08 0-1.49L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+            Search
+          </button>
+        </div>
+      </div>
+
+      <!-- Explorer Results -->
+      <div id="explorerResults" style="display: none;">
+        <!-- Address Results -->
+        <div id="explorerAddressResults" style="display: none;">
+          <div class="card">
+            <h2>
+              <svg fill="currentColor" viewBox="0 0 24 24" style="width: 24px; height: 24px;">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+              </svg>
+              Address Details
+            </h2>
+            <div id="addressInfo">
+              <div class="empty-state">Loading...</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Address Transactions</h2>
+            <div id="addressTransactions">
+              <div class="empty-state">Loading...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transaction Results -->
+        <div id="explorerTxResults" style="display: none;">
+          <div class="card">
+            <h2>
+              <svg fill="currentColor" viewBox="0 0 24 24" style="width: 24px; height: 24px;">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z"/>
+              </svg>
+              Transaction Details
+            </h2>
+            <div id="txSummary">
+              <div class="empty-state">Loading...</div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <h2>
+                <svg fill="currentColor" viewBox="0 0 24 24" style="width: 24px; height: 24px;">
+                  <path d="M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z"/>
+                </svg>
+                Inputs (<span id="txInputCount">0</span>)
+              </h2>
+              <div id="txInputs">
+                <div class="empty-state">Loading...</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h2>
+                <svg fill="currentColor" viewBox="0 0 24 24" style="width: 24px; height: 24px;">
+                  <path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/>
+                </svg>
+                Outputs (<span id="txOutputCount">0</span>)
+              </h2>
+              <div id="txOutputs">
+                <div class="empty-state">Loading...</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Raw Transaction Data</h2>
+            <div id="txRawData" class="result-box" style="display: block; max-height: 300px;">
+              Loading...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Explorer Error -->
+      <div id="explorerError" class="card" style="display: none;">
+        <div id="explorerErrorMessage" class="result-box error"></div>
+      </div>
+    </div>
+
+    <!-- Electrs Tab -->
+    <div class="tab-content" id="tab-electrs">
+      <div class="card">
+        <h2>
+          <svg fill="currentColor" viewBox="0 0 24 24" style="width: 24px; height: 24px;">
+            <path d="M13 2.05v2.02c3.95.49 7 3.85 7 7.93 0 3.21-1.92 6.01-4.69 7.29l1.06 1.77C19.69 19.47 22 15.99 22 12c0-4.97-3.63-9.09-8.39-9.87L13 2.05zM12 19c-3.87 0-7-3.13-7-7 0-3.53 2.61-6.43 6-6.92V2.05C5.06 2.56 1 6.81 1 12c0 5.52 4.47 10 10 10 3.99 0 7.47-2.31 9.06-5.69l-1.77-1.06C16.99 17.48 14.64 19 12 19z"/>
+            <path d="M11 7v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>
+          </svg>
+          Electrs Server
+        </h2>
+        <p style="color: var(--text-secondary); margin-bottom: 20px;">
+          Electrs is an efficient Electrum server implementation. Connect your Electrum wallet to query the blockchain without running a full node.
+        </p>
+        <div id="electrsInfo">
+          <div class="empty-state">Loading connection info...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>What is Electrs?</h2>
+        <div style="color: var(--text-secondary); line-height: 1.8;">
+          <p><strong>Electrs</strong> provides an Electrum server that indexes the Bitcoin blockchain and allows lightweight wallets to:</p>
+          <ul style="margin: 16px 0; padding-left: 24px;">
+            <li>Query address balances and transaction history</li>
+            <li>Broadcast transactions to the network</li>
+            <li>Subscribe to address notifications</li>
+            <li>Get fee estimates</li>
+          </ul>
+          <p style="margin-top: 16px;">
+            <strong>Port 50001</strong> is exposed for TCP connections using the Electrum protocol.
+            Connect any Electrum-compatible wallet to interact with this regtest node.
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Compatible Wallets</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div style="padding: 16px; background: var(--bg-primary); border-radius: 8px;">
+            <strong>Electrum</strong>
+            <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px;">Desktop wallet</div>
+          </div>
+          <div style="padding: 16px; background: var(--bg-primary); border-radius: 8px;">
+            <strong>Sparrow</strong>
+            <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px;">Desktop wallet</div>
+          </div>
+          <div style="padding: 16px; background: var(--bg-primary); border-radius: 8px;">
+            <strong>BlueWallet</strong>
+            <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px;">Mobile wallet</div>
+          </div>
+          <div style="padding: 16px; background: var(--bg-primary); border-radius: 8px;">
+            <strong>Wasabi</strong>
+            <div style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px;">Privacy wallet</div>
+          </div>
         </div>
       </div>
     </div>
@@ -1172,6 +1341,62 @@
         document.getElementById('statusDot').classList.remove('connected');
         document.getElementById('statusText').textContent = 'Disconnected';
         return false;
+      }
+    }
+
+    // Check Electrs connection status
+    async function checkElectrsConnection() {
+      try {
+        const health = await api('/electrs/health');
+        document.getElementById('electrsStatusDot').classList.add('connected');
+        document.getElementById('electrsStatusText').textContent = 'Electrs On';
+        return true;
+      } catch (error) {
+        document.getElementById('electrsStatusDot').classList.remove('connected');
+        document.getElementById('electrsStatusText').textContent = 'Electrs Off';
+        return false;
+      }
+    }
+
+    // Load Electrs connection info
+    async function loadElectrsInfo() {
+      try {
+        const info = await api('/electrs/info');
+        const electrsInfoEl = document.getElementById('electrsInfo');
+        if (electrsInfoEl) {
+          electrsInfoEl.innerHTML = `
+            <div class="stats-grid" style="margin: 0;">
+              <div class="stat-card">
+                <h3>Status</h3>
+                <div class="value">
+                  <span class="badge ${info.connected ? 'badge-success' : 'badge-danger'}">
+                    ${info.connected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
+              </div>
+              <div class="stat-card">
+                <h3>Host</h3>
+                <div class="value" style="font-size: 1rem;">${info.host}:${info.port}</div>
+              </div>
+              <div class="stat-card">
+                <h3>Protocol</h3>
+                <div class="value" style="font-size: 1rem;">${info.protocol.toUpperCase()}</div>
+              </div>
+              <div class="stat-card">
+                <h3>Network</h3>
+                <div class="value" style="font-size: 1rem;">${info.network}</div>
+              </div>
+            </div>
+            <div style="margin-top: 16px; padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+              <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Connect with Electrum:</div>
+              <code style="font-size: 0.85rem; word-break: break-all; display: block; padding: 8px; background: var(--bg-tertiary); border-radius: 4px;">
+                electrum --regtest --oneserver --server ${info.host}:${info.port}:t
+              </code>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Failed to load electrs info:', error);
       }
     }
 
@@ -1763,14 +1988,511 @@
       await executeRPC();
     }
 
+    // Explorer Functions
+    function isTransactionId(input) {
+      // Transaction IDs are 64 hex characters
+      return /^[a-fA-F0-9]{64}$/.test(input);
+    }
+
+    function isAddress(input) {
+      // Bitcoin address patterns (mainnet, testnet, regtest)
+      // bech32/bech32m: bc1, tb1, bcrt1
+      // P2SH: starts with 3 (mainnet), 2 (testnet/regtest)
+      // Legacy: starts with 1 (mainnet), m/n (testnet/regtest)
+      return /^(bc1|tb1|bcrt1|[123mn])[a-zA-HJ-NP-Z0-9]{25,62}$/i.test(input);
+    }
+
+    async function explorerLookup() {
+      const input = document.getElementById('explorerSearch').value.trim();
+
+      if (!input) {
+        showExplorerError('Please enter an address or transaction ID');
+        return;
+      }
+
+      // Hide previous results
+      document.getElementById('explorerResults').style.display = 'none';
+      document.getElementById('explorerAddressResults').style.display = 'none';
+      document.getElementById('explorerTxResults').style.display = 'none';
+      document.getElementById('explorerError').style.display = 'none';
+
+      if (isTransactionId(input)) {
+        await explorerLookupTransaction(input);
+      } else if (isAddress(input)) {
+        await explorerLookupAddress(input);
+      } else {
+        // Try transaction first, then address
+        try {
+          await explorerLookupTransaction(input);
+        } catch (e) {
+          try {
+            await explorerLookupAddress(input);
+          } catch (e2) {
+            showExplorerError('Invalid input. Please enter a valid Bitcoin address or transaction ID.');
+          }
+        }
+      }
+    }
+
+    function showExplorerError(message) {
+      document.getElementById('explorerResults').style.display = 'none';
+      document.getElementById('explorerError').style.display = 'block';
+      document.getElementById('explorerErrorMessage').textContent = message;
+    }
+
+    async function explorerLookupTransaction(txid) {
+      try {
+        // First try to get wallet transaction info for confirmations
+        let walletTx = null;
+        try {
+          walletTx = await api('/transaction/' + txid);
+        } catch (e) {
+          // Transaction might not be in wallet, that's okay
+        }
+
+        // Get the decoded transaction using getrawtransaction for full vin/vout details
+        const rawResponse = await api('/transaction/' + txid + '/raw?verbose=true');
+        const tx = rawResponse.raw;
+
+        if (!tx || typeof tx === 'string') {
+          // If verbose=true didn't work, we got hex string - need to decode it
+          throw new Error('Could not decode transaction');
+        }
+
+        document.getElementById('explorerResults').style.display = 'block';
+        document.getElementById('explorerAddressResults').style.display = 'none';
+        document.getElementById('explorerTxResults').style.display = 'block';
+        document.getElementById('explorerError').style.display = 'none';
+
+        // Calculate total input/output values
+        let totalOutput = 0;
+        if (tx.vout) {
+          tx.vout.forEach(out => { totalOutput += out.value; });
+        }
+
+        // Transaction summary - use wallet tx for confirmations if available
+        const confirmations = walletTx?.confirmations ?? tx.confirmations ?? 0;
+        const statusBadge = confirmations > 0
+          ? `<span class="badge badge-success">${confirmations} confirmations</span>`
+          : '<span class="badge badge-warning">Unconfirmed</span>';
+
+        // Get block info from either source
+        const blockhash = tx.blockhash || walletTx?.blockhash;
+        const blocktime = tx.blocktime || walletTx?.blocktime || walletTx?.time;
+
+        document.getElementById('txSummary').innerHTML = `
+          <div class="stats-grid" style="margin: 0;">
+            <div class="stat-card">
+              <h3>Transaction ID</h3>
+              <div class="value wrap-ok" style="font-size: 0.85rem; word-break: break-all;">
+                ${tx.txid}
+                <button class="copy-btn" onclick="copyToClipboard('${tx.txid}')" style="margin-left: 8px;">Copy</button>
+              </div>
+            </div>
+            <div class="stat-card">
+              <h3>Status</h3>
+              <div class="value">${statusBadge}</div>
+            </div>
+            <div class="stat-card">
+              <h3>Size</h3>
+              <div class="value">${tx.size || 'N/A'} B / ${tx.vsize || 'N/A'} vB</div>
+            </div>
+            <div class="stat-card">
+              <h3>Total Output</h3>
+              <div class="value">${totalOutput.toFixed(8)} BTC</div>
+            </div>
+            ${blockhash ? `
+              <div class="stat-card">
+                <h3>Block Hash</h3>
+                <div class="value wrap-ok" style="font-size: 0.75rem; word-break: break-all;">${blockhash}</div>
+              </div>
+            ` : ''}
+            ${blocktime ? `
+              <div class="stat-card">
+                <h3>Block Time</h3>
+                <div class="value" style="font-size: 0.9rem;">${new Date(blocktime * 1000).toLocaleString()}</div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+
+        // Update input/output counts
+        const vinArray = tx.vin || [];
+        const voutArray = tx.vout || [];
+        document.getElementById('txInputCount').textContent = vinArray.length;
+        document.getElementById('txOutputCount').textContent = voutArray.length;
+
+        // Render inputs
+        if (vinArray.length === 0 || (vinArray.length === 1 && vinArray[0].coinbase)) {
+          document.getElementById('txInputs').innerHTML = `
+            <div style="padding: 16px; background: var(--bg-primary); border-radius: 8px; text-align: center;">
+              <span class="badge badge-success" style="font-size: 0.9rem;">Coinbase (Mining Reward)</span>
+            </div>
+          `;
+        } else {
+          document.getElementById('txInputs').innerHTML = `
+            <div style="max-height: 400px; overflow-y: auto;">
+              ${vinArray.map((input, idx) => `
+                <div style="padding: 12px; background: var(--bg-primary); border-radius: 8px; margin-bottom: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: var(--text-secondary); font-size: 0.85rem;">#${idx}</span>
+                    ${input.prevout && input.prevout.value ? `
+                      <span style="color: var(--accent-orange); font-weight: 600;">${input.prevout.value.toFixed(8)} BTC</span>
+                    ` : ''}
+                  </div>
+                  <div style="font-family: monospace; font-size: 0.8rem; word-break: break-all; color: var(--text-secondary);">
+                    ${input.txid ? `${input.txid}:${input.vout}` : 'N/A'}
+                  </div>
+                  ${input.prevout && input.prevout.scriptPubKey && input.prevout.scriptPubKey.address ? `
+                    <div style="margin-top: 8px;">
+                      <a href="#" onclick="explorerSearchAddress('${input.prevout.scriptPubKey.address}'); return false;"
+                         style="color: var(--accent-blue); font-family: monospace; font-size: 0.85rem; text-decoration: none;">
+                        ${input.prevout.scriptPubKey.address}
+                      </a>
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        // Render outputs
+        document.getElementById('txOutputs').innerHTML = `
+          <div style="max-height: 400px; overflow-y: auto;">
+            ${voutArray.map((output, idx) => `
+              <div style="padding: 12px; background: var(--bg-primary); border-radius: 8px; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span style="color: var(--text-secondary); font-size: 0.85rem;">#${idx}</span>
+                  <span style="color: var(--accent-green); font-weight: 600;">${output.value.toFixed(8)} BTC</span>
+                </div>
+                ${output.scriptPubKey.address ? `
+                  <div>
+                    <a href="#" onclick="explorerSearchAddress('${output.scriptPubKey.address}'); return false;"
+                       style="color: var(--accent-blue); font-family: monospace; font-size: 0.85rem; text-decoration: none;">
+                      ${output.scriptPubKey.address}
+                    </a>
+                  </div>
+                ` : `
+                  <div style="color: var(--text-secondary); font-size: 0.85rem;">
+                    ${output.scriptPubKey.type || 'Unknown type'}
+                  </div>
+                `}
+                <div style="margin-top: 4px; color: var(--text-secondary); font-size: 0.75rem;">
+                  Type: ${output.scriptPubKey.type || 'unknown'}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+
+        // Raw transaction data
+        document.getElementById('txRawData').textContent = JSON.stringify(tx, null, 2);
+
+      } catch (error) {
+        showExplorerError('Transaction not found: ' + error.message);
+        throw error;
+      }
+    }
+
+    async function explorerLookupAddress(address) {
+      try {
+        // First validate the address
+        const validation = await api('/validateaddress/' + address);
+
+        if (!validation.isvalid) {
+          showExplorerError('Invalid Bitcoin address');
+          return;
+        }
+
+        document.getElementById('explorerResults').style.display = 'block';
+        document.getElementById('explorerAddressResults').style.display = 'block';
+        document.getElementById('explorerTxResults').style.display = 'none';
+        document.getElementById('explorerError').style.display = 'none';
+
+        // Try to get wallet info (may fail if address is not in wallet)
+        let addressInfo = null;
+        try {
+          addressInfo = await api('/wallet/addressinfo/' + address);
+        } catch (e) {
+          // Address not in wallet, that's okay
+        }
+
+        // Try Electrs first for comprehensive address data (works for ANY address)
+        let electrsData = null;
+        let electrsTxs = [];
+        let electrsUtxos = [];
+        let balance = null;
+        let txCount = 0;
+
+        try {
+          electrsData = await api('/electrs/address/' + address);
+          electrsTxs = await api('/electrs/address/' + address + '/txs');
+          electrsUtxos = await api('/electrs/address/' + address + '/utxo');
+
+          // Calculate balance from electrs data (values in satoshis)
+          const funded = electrsData.chain_stats?.funded_txo_sum || 0;
+          const spent = electrsData.chain_stats?.spent_txo_sum || 0;
+          const mempoolFunded = electrsData.mempool_stats?.funded_txo_sum || 0;
+          const mempoolSpent = electrsData.mempool_stats?.spent_txo_sum || 0;
+
+          balance = {
+            received: (funded + mempoolFunded) / 100000000,
+            sent: (spent + mempoolSpent) / 100000000,
+            balance: (funded - spent + mempoolFunded - mempoolSpent) / 100000000
+          };
+          txCount = (electrsData.chain_stats?.tx_count || 0) + (electrsData.mempool_stats?.tx_count || 0);
+        } catch (e) {
+          // Electrs not available, fall back to wallet-based lookup
+          console.log('Electrs lookup failed, falling back to wallet:', e.message);
+
+          // Get wallet transactions and filter by address
+          try {
+            const allTxs = await api('/wallet/transactions?count=100');
+            const addressTxs = allTxs.filter(tx => tx.address === address);
+
+            let received = 0;
+            let sent = 0;
+            addressTxs.forEach(tx => {
+              if (tx.category === 'receive' || tx.category === 'generate' || tx.category === 'immature') {
+                received += Math.abs(tx.amount);
+              } else if (tx.category === 'send') {
+                sent += Math.abs(tx.amount);
+              }
+            });
+            balance = { received, sent, balance: received - sent };
+            txCount = addressTxs.length;
+            electrsTxs = addressTxs; // Use wallet txs for display
+          } catch (e2) {
+            // No wallet transactions either
+          }
+        }
+
+        // Build address info display
+        const isWalletAddress = addressInfo && addressInfo.ismine;
+        const dataSource = electrsData ? 'Electrs' : 'Wallet';
+
+        document.getElementById('addressInfo').innerHTML = `
+          <div class="stats-grid" style="margin: 0;">
+            <div class="stat-card">
+              <h3>Address</h3>
+              <div class="value wrap-ok" style="font-size: 0.85rem; word-break: break-all;">
+                ${address}
+                <button class="copy-btn" onclick="copyToClipboard('${address}')" style="margin-left: 8px;">Copy</button>
+              </div>
+            </div>
+            <div class="stat-card">
+              <h3>Type</h3>
+              <div class="value" style="font-size: 1rem;">
+                ${validation.address_type || (address.startsWith('bcrt1p') || address.startsWith('bc1p') || address.startsWith('tb1p') ? 'witness_v1_taproot' :
+                  address.startsWith('bcrt1') || address.startsWith('bc1') || address.startsWith('tb1') ? 'witness_v0_keyhash' :
+                  address.startsWith('3') || address.startsWith('2') ? 'scripthash' : 'pubkeyhash')}
+              </div>
+            </div>
+            <div class="stat-card">
+              <h3>Wallet Status</h3>
+              <div class="value">
+                ${isWalletAddress
+                  ? '<span class="badge badge-success">In Wallet</span>'
+                  : '<span class="badge badge-warning">External</span>'}
+              </div>
+            </div>
+            <div class="stat-card">
+              <h3>Data Source</h3>
+              <div class="value" style="font-size: 1rem;">
+                <span class="badge ${electrsData ? 'badge-success' : 'badge-warning'}">${dataSource}</span>
+              </div>
+            </div>
+            ${balance ? `
+              <div class="stat-card">
+                <h3>Total Received</h3>
+                <div class="value" style="color: var(--accent-green);">${balance.received.toFixed(8)} BTC</div>
+              </div>
+              <div class="stat-card">
+                <h3>Total Sent</h3>
+                <div class="value" style="color: var(--accent-red);">${balance.sent.toFixed(8)} BTC</div>
+              </div>
+              <div class="stat-card">
+                <h3>Balance</h3>
+                <div class="value">${balance.balance.toFixed(8)} BTC</div>
+              </div>
+            ` : ''}
+            <div class="stat-card">
+              <h3>Transactions</h3>
+              <div class="value">${txCount}</div>
+            </div>
+            ${electrsUtxos.length > 0 ? `
+              <div class="stat-card">
+                <h3>UTXOs</h3>
+                <div class="value">${electrsUtxos.length}</div>
+              </div>
+            ` : ''}
+            ${addressInfo && addressInfo.labels && addressInfo.labels.length > 0 ? `
+              <div class="stat-card">
+                <h3>Label</h3>
+                <div class="value" style="font-size: 1rem;">${addressInfo.labels.join(', ')}</div>
+              </div>
+            ` : ''}
+          </div>
+          ${addressInfo && addressInfo.hdkeypath ? `
+            <div style="margin-top: 16px; padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+              <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 4px;">HD Key Path</div>
+              <div style="font-family: monospace; font-size: 0.9rem;">${addressInfo.hdkeypath}</div>
+            </div>
+          ` : ''}
+          ${validation.scriptPubKey ? `
+            <div style="margin-top: 16px; padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+              <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 4px;">Script PubKey</div>
+              <div style="font-family: monospace; font-size: 0.8rem; word-break: break-all;">${validation.scriptPubKey}</div>
+            </div>
+          ` : ''}
+          ${electrsUtxos.length > 0 ? `
+            <div style="margin-top: 16px;">
+              <h3 style="margin-bottom: 12px; color: var(--text-secondary);">UTXOs (${electrsUtxos.length})</h3>
+              <div style="max-height: 200px; overflow-y: auto;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Txid</th>
+                      <th>Vout</th>
+                      <th>Value (BTC)</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${electrsUtxos.map(utxo => `
+                      <tr>
+                        <td class="truncate" style="max-width: 150px;" title="${utxo.txid}">${utxo.txid}</td>
+                        <td>${utxo.vout}</td>
+                        <td>${(utxo.value / 100000000).toFixed(8)}</td>
+                        <td>${utxo.status?.confirmed ? '<span class="badge badge-success">Confirmed</span>' : '<span class="badge badge-warning">Unconfirmed</span>'}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ` : ''}
+        `;
+
+        // Address transactions - handle both electrs and wallet formats
+        if (electrsTxs.length > 0) {
+          // Check if we have electrs data (has 'txid' at root) or wallet data (has 'category')
+          const isElectrsFormat = electrsTxs[0] && !electrsTxs[0].category;
+
+          if (isElectrsFormat) {
+            // Electrs transaction format
+            document.getElementById('addressTransactions').innerHTML = `
+              <table>
+                <thead>
+                  <tr>
+                    <th>TXID</th>
+                    <th>Status</th>
+                    <th>Block Height</th>
+                    <th>Fee (sats)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${electrsTxs.slice(0, 50).map(tx => `
+                    <tr style="cursor: pointer;" onclick="explorerSearchTxid('${tx.txid}')">
+                      <td class="truncate" title="${tx.txid}" style="max-width: 200px;">${tx.txid}</td>
+                      <td>
+                        <span class="badge ${tx.status?.confirmed ? 'badge-success' : 'badge-warning'}">
+                          ${tx.status?.confirmed ? 'Confirmed' : 'Unconfirmed'}
+                        </span>
+                      </td>
+                      <td>${tx.status?.block_height || 'Pending'}</td>
+                      <td>${tx.fee || 'N/A'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              ${electrsTxs.length > 50 ? `<div style="text-align: center; padding: 12px; color: var(--text-secondary);">Showing first 50 of ${electrsTxs.length} transactions</div>` : ''}
+            `;
+          } else {
+            // Wallet transaction format
+            document.getElementById('addressTransactions').innerHTML = `
+              <table>
+                <thead>
+                  <tr>
+                    <th>TXID</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Confirmations</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${electrsTxs.map(tx => `
+                    <tr style="cursor: pointer;" onclick="explorerSearchTxid('${tx.txid}')">
+                      <td class="truncate" title="${tx.txid}" style="max-width: 150px;">${tx.txid}</td>
+                      <td>
+                        <span class="badge ${tx.category === 'receive' || tx.category === 'generate' ? 'badge-success' : 'badge-danger'}">
+                          ${tx.category}
+                        </span>
+                      </td>
+                      <td style="color: ${tx.amount >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
+                        ${tx.amount >= 0 ? '+' : ''}${tx.amount.toFixed(8)} BTC
+                      </td>
+                      <td>${tx.confirmations}</td>
+                      <td>${tx.time ? new Date(tx.time * 1000).toLocaleString() : 'Pending'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            `;
+          }
+        } else {
+          document.getElementById('addressTransactions').innerHTML = `
+            <div class="empty-state">
+              No transactions found for this address.
+              <br><br>
+              <span style="font-size: 0.85rem; color: var(--text-secondary);">
+                ${electrsData ? 'This address has no transaction history.' : 'Electrs is not available. Only wallet addresses can be queried.'}
+              </span>
+            </div>
+          `;
+        }
+
+      } catch (error) {
+        showExplorerError('Error looking up address: ' + error.message);
+        throw error;
+      }
+    }
+
+    // Helper functions to search from links
+    function explorerSearchAddress(address) {
+      document.getElementById('explorerSearch').value = address;
+      explorerLookup();
+    }
+
+    function explorerSearchTxid(txid) {
+      document.getElementById('explorerSearch').value = txid;
+      explorerLookup();
+    }
+
+    // Allow Enter key to trigger search
+    document.addEventListener('DOMContentLoaded', () => {
+      const explorerInput = document.getElementById('explorerSearch');
+      if (explorerInput) {
+        explorerInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            explorerLookup();
+          }
+        });
+      }
+    });
+
     // Refresh all data
     async function refreshAll() {
       await checkConnection();
+      await checkElectrsConnection();
       await refreshStats();
       loadMiningInfo();
       loadWalletInfo();
       loadUTXOs();
       loadRecentTransactions();
+      loadElectrsInfo();
       loadMempoolInfo();
       loadRecentBlocks();
     }
@@ -1838,6 +2560,7 @@
       }
 
       saveTheme();
+      updateThemeButtonVisibility();
     }
 
     function updateColorFromText(type, value) {
@@ -1852,6 +2575,74 @@
       const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amount));
       const b = Math.min(255, Math.max(0, (num & 0x0000FF) + amount));
       return '#' + (0x1000000 + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+
+    // Calculate relative luminance of a color (WCAG formula)
+    function getLuminance(hex) {
+      const num = parseInt(hex.slice(1), 16);
+      const r = (num >> 16) / 255;
+      const g = ((num >> 8) & 0x00FF) / 255;
+      const b = (num & 0x0000FF) / 255;
+
+      const toLinear = (c) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+
+      return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+    }
+
+    // Calculate contrast ratio between two colors
+    function getContrastRatio(hex1, hex2) {
+      const l1 = getLuminance(hex1);
+      const l2 = getLuminance(hex2);
+      const lighter = Math.max(l1, l2);
+      const darker = Math.min(l1, l2);
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    // Update theme panel buttons to ensure visibility
+    function updateThemeButtonVisibility() {
+      const resetBtn = document.getElementById('themeResetBtn');
+      const doneBtn = document.getElementById('themeDoneBtn');
+      if (!resetBtn || !doneBtn) return;
+
+      // Get current colors
+      const styles = getComputedStyle(document.documentElement);
+      const bgColor = styles.getPropertyValue('--bg-tertiary').trim() || '#21262d';
+      const textColor = styles.getPropertyValue('--text-primary').trim() || '#f0f6fc';
+      const accentColor = styles.getPropertyValue('--accent-orange').trim() || '#3b82f6';
+      const panelBg = styles.getPropertyValue('--bg-secondary').trim() || '#161b22';
+
+      // Check contrast for Reset button (btn-secondary uses bg-tertiary)
+      const resetBgContrast = getContrastRatio(bgColor, panelBg);
+      const resetTextContrast = getContrastRatio(textColor, bgColor);
+
+      // Check contrast for Done button (btn-primary uses accent color)
+      const doneBgContrast = getContrastRatio(accentColor, panelBg);
+
+      // Minimum contrast ratio for visibility (WCAG AA is 4.5, we use 2.5 for buttons)
+      const minContrast = 2.5;
+
+      // Reset button - add high-contrast border if background blends
+      if (resetBgContrast < minContrast || resetTextContrast < minContrast) {
+        // Use inverted colors for high contrast
+        const isLightBg = getLuminance(panelBg) > 0.5;
+        resetBtn.style.background = isLightBg ? '#1f2937' : '#e5e7eb';
+        resetBtn.style.color = isLightBg ? '#ffffff' : '#1f2937';
+        resetBtn.style.border = isLightBg ? '2px solid #374151' : '2px solid #9ca3af';
+      } else {
+        resetBtn.style.background = '';
+        resetBtn.style.color = '';
+        resetBtn.style.border = '';
+      }
+
+      // Done button - ensure accent color is visible
+      if (doneBgContrast < minContrast) {
+        const isLightBg = getLuminance(panelBg) > 0.5;
+        doneBtn.style.background = isLightBg ? '#1d4ed8' : '#60a5fa';
+        doneBtn.style.border = isLightBg ? '2px solid #1e40af' : '2px solid #93c5fd';
+      } else {
+        doneBtn.style.background = '';
+        doneBtn.style.border = '';
+      }
     }
 
     function applyPreset(name) {
@@ -1962,10 +2753,12 @@
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
       loadTheme();
+      updateThemeButtonVisibility();
       refreshAll();
       // Auto-refresh every 10 seconds
       setInterval(refreshStats, 10000);
       setInterval(checkConnection, 30000);
+      setInterval(checkElectrsConnection, 30000);
     });
   </script>
 </body>

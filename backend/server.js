@@ -7,12 +7,51 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Bitcoin RPC Configuration - Uses environment variables for Umbrel
+const fs = require('fs');
+
+// Bitcoin RPC Configuration
 const RPC_HOST = process.env.BITCOIN_RPC_HOST || 'bitcoin';
 const RPC_PORT = process.env.BITCOIN_RPC_PORT || '18443';
-const RPC_USER = process.env.BITCOIN_RPC_USER || 'umbrel';
-const RPC_PASS = process.env.BITCOIN_RPC_PASS || 'moneyprintergobrrr';
 const RPC_WALLET = process.env.BITCOIN_RPC_WALLET || 'regtest_wallet';
+const COOKIE_FILE = process.env.BITCOIN_COOKIE_FILE || '';
+
+// RPC credentials - either from cookie file or environment variables
+let RPC_USER = process.env.BITCOIN_RPC_USER || '';
+let RPC_PASS = process.env.BITCOIN_RPC_PASS || '';
+
+// Function to read cookie file
+function readCookieFile() {
+  if (COOKIE_FILE && fs.existsSync(COOKIE_FILE)) {
+    try {
+      const cookie = fs.readFileSync(COOKIE_FILE, 'utf8').trim();
+      const [user, pass] = cookie.split(':');
+      if (user && pass) {
+        RPC_USER = user;
+        RPC_PASS = pass;
+        console.log(`Read RPC credentials from cookie file: ${COOKIE_FILE}`);
+        return true;
+      }
+    } catch (e) {
+      console.error(`Failed to read cookie file: ${e.message}`);
+    }
+  }
+  return false;
+}
+
+// Try to read cookie file on startup
+if (COOKIE_FILE) {
+  readCookieFile();
+  // Re-read cookie file periodically (it can change on bitcoind restart)
+  setInterval(readCookieFile, 30000);
+}
+
+// Default credentials if no cookie file
+if (!RPC_USER) RPC_USER = 'regtest';
+if (!RPC_PASS) RPC_PASS = 'regtest';
+
+// Electrs Configuration
+const ELECTRS_HOST = process.env.ELECTRS_HOST || 'electrs';
+const ELECTRS_PORT = process.env.ELECTRS_PORT || '50001';
 
 // Bitcoin RPC call helper
 // useWallet: true for wallet-specific calls, false for node-level calls
@@ -63,6 +102,88 @@ async function bitcoinRPC(method, params = [], useWallet = false) {
     req.on('error', (e) => reject(e));
     req.write(postData);
     req.end();
+  });
+}
+
+const net = require('net');
+
+// Check if Electrs TCP port is reachable
+async function checkElectrsTCP() {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    const timeout = 3000;
+
+    socket.setTimeout(timeout);
+
+    socket.on('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+
+    socket.on('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+
+    socket.on('error', () => {
+      socket.destroy();
+      resolve(false);
+    });
+
+    socket.connect(parseInt(ELECTRS_PORT), ELECTRS_HOST);
+  });
+}
+
+// Electrs uses TCP Electrum protocol, not HTTP
+// This function sends a simple Electrum JSON-RPC request
+async function electrsRPC(method, params = []) {
+  return new Promise((resolve, reject) => {
+    const socket = new net.Socket();
+    const timeout = 5000;
+    let data = '';
+
+    socket.setTimeout(timeout);
+
+    const request = JSON.stringify({
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: method,
+      params: params
+    }) + '\n';
+
+    socket.on('connect', () => {
+      socket.write(request);
+    });
+
+    socket.on('data', (chunk) => {
+      data += chunk.toString();
+      // Electrum responses are newline-delimited
+      if (data.includes('\n')) {
+        socket.destroy();
+        try {
+          const response = JSON.parse(data.trim());
+          if (response.error) {
+            reject(new Error(response.error.message || 'Electrs RPC error'));
+          } else {
+            resolve(response.result);
+          }
+        } catch (e) {
+          reject(new Error('Failed to parse Electrs response'));
+        }
+      }
+    });
+
+    socket.on('timeout', () => {
+      socket.destroy();
+      reject(new Error('Electrs connection timeout'));
+    });
+
+    socket.on('error', (e) => {
+      socket.destroy();
+      reject(new Error('Electrs connection error: ' + e.message));
+    });
+
+    socket.connect(parseInt(ELECTRS_PORT), ELECTRS_HOST);
   });
 }
 
@@ -771,6 +892,161 @@ app.post('/api/chain/reconsider', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ============================================
+// Electrs API Endpoints (Electrum Protocol)
+// ============================================
+
+// Check Electrs health/status
+app.get('/api/electrs/health', async (req, res) => {
+  try {
+    const isConnected = await checkElectrsTCP();
+    if (!isConnected) {
+      return res.status(503).json({ status: 'offline', message: 'Electrs not reachable' });
+    }
+
+    // Get server banner/version using Electrum protocol
+    const banner = await electrsRPC('server.banner');
+    res.json({
+      status: 'ok',
+      banner: banner,
+      host: ELECTRS_HOST,
+      port: ELECTRS_PORT
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Get Electrs connection info (for external wallets)
+app.get('/api/electrs/info', async (req, res) => {
+  try {
+    const isConnected = await checkElectrsTCP();
+    // Get the host from the request (how the user is accessing the dashboard)
+    const host = req.hostname || req.headers.host?.split(':')[0] || 'localhost';
+    const externalPort = process.env.ELECTRS_EXTERNAL_PORT || '60401';
+    res.json({
+      connected: isConnected,
+      host: host,
+      port: parseInt(externalPort),
+      protocol: 'tcp',
+      network: 'regtest',
+      note: `Connect Electrum wallet with: electrum --regtest --oneserver --server ${host}:${externalPort}:t`
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get address balance using Electrum protocol
+app.get('/api/electrs/address/:address', async (req, res) => {
+  try {
+    const { address } = req.params;
+    // Get scripthash from address for Electrum protocol
+    const scripthash = await getScripthashFromAddress(address);
+    const balance = await electrsRPC('blockchain.scripthash.get_balance', [scripthash]);
+    const history = await electrsRPC('blockchain.scripthash.get_history', [scripthash]);
+
+    res.json({
+      address: address,
+      chain_stats: {
+        funded_txo_sum: balance.confirmed || 0,
+        spent_txo_sum: 0, // Would need to calculate from history
+        tx_count: history.length
+      },
+      mempool_stats: {
+        funded_txo_sum: balance.unconfirmed || 0,
+        spent_txo_sum: 0,
+        tx_count: 0
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get address transactions using Electrum protocol
+app.get('/api/electrs/address/:address/txs', async (req, res) => {
+  try {
+    const { address } = req.params;
+    const scripthash = await getScripthashFromAddress(address);
+    const history = await electrsRPC('blockchain.scripthash.get_history', [scripthash]);
+
+    // History returns [{tx_hash, height}, ...]
+    const txs = history.map(item => ({
+      txid: item.tx_hash,
+      status: {
+        confirmed: item.height > 0,
+        block_height: item.height > 0 ? item.height : null
+      }
+    }));
+
+    res.json(txs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get address UTXOs using Electrum protocol
+app.get('/api/electrs/address/:address/utxo', async (req, res) => {
+  try {
+    const { address } = req.params;
+    const scripthash = await getScripthashFromAddress(address);
+    const listunspent = await electrsRPC('blockchain.scripthash.listunspent', [scripthash]);
+
+    // Convert to expected format
+    const utxos = listunspent.map(utxo => ({
+      txid: utxo.tx_hash,
+      vout: utxo.tx_pos,
+      value: utxo.value,
+      status: {
+        confirmed: utxo.height > 0,
+        block_height: utxo.height > 0 ? utxo.height : null
+      }
+    }));
+
+    res.json(utxos);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get transaction from Electrs using Electrum protocol
+app.get('/api/electrs/tx/:txid', async (req, res) => {
+  try {
+    const { txid } = req.params;
+    const hex = await electrsRPC('blockchain.transaction.get', [txid, false]);
+    res.json({ txid, hex });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Helper: Convert address to scripthash for Electrum protocol
+// This is a simplified version - real implementation needs proper address parsing
+const crypto = require('crypto');
+
+async function getScripthashFromAddress(address) {
+  // For Electrum protocol, we need to convert address to scripthash
+  // This requires deriving the scriptPubKey and hashing it
+  // Use Bitcoin Core to get the scriptPubKey
+  try {
+    const validation = await bitcoinRPC('validateaddress', [address]);
+    if (!validation.isvalid) {
+      throw new Error('Invalid address');
+    }
+
+    // Get scriptPubKey hex
+    let scriptPubKey = validation.scriptPubKey;
+
+    // SHA256 hash, then reverse bytes for Electrum protocol
+    const hash = crypto.createHash('sha256').update(Buffer.from(scriptPubKey, 'hex')).digest();
+    const reversed = Buffer.from(hash).reverse();
+    return reversed.toString('hex');
+  } catch (error) {
+    throw new Error('Failed to convert address to scripthash: ' + error.message);
+  }
+}
 
 // Generic RPC call (for advanced users)
 app.post('/api/rpc', async (req, res) => {

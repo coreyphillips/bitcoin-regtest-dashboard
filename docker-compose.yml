@@ -1,28 +1,117 @@
-version: "3.7"
+# Bitcoin Regtest Dashboard - Standalone Setup
+# Includes its own Bitcoin Core node and Electrs instance.
+# No external dependencies required - everything runs self-contained.
+#
+# Usage:
+#   docker-compose up -d
+#
+# Access the dashboard at: http://localhost:3000
 
 services:
-  app_proxy:
-    environment:
-      APP_HOST: bitcoin-regtest-dashboard_web_1
-      APP_PORT: 3000
+  # Bitcoin Core in regtest mode (uses cookie auth)
+  bitcoin:
+    image: getumbrel/bitcoind:v28.1
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Remove ready flag from previous run to ensure fresh permission setup
+        rm -f /data/.bitcoin/regtest/.ready
+        bitcoind -regtest \
+          -server=1 \
+          -rpcbind=0.0.0.0 \
+          -rpcallowip=0.0.0.0/0 \
+          -rpcport=18443 \
+          -txindex=1 \
+          -fallbackfee=0.00001 \
+          -disablewallet=0 \
+          -zmqpubrawblock=tcp://0.0.0.0:28332 \
+          -zmqpubrawtx=tcp://0.0.0.0:28333 &
+        BITCOIND_PID=$!
+        # Wait for cookie file and make directory + file readable
+        while [ ! -f /data/.bitcoin/regtest/.cookie ]; do sleep 1; done
+        chmod 755 /data/.bitcoin/regtest
+        chmod 644 /data/.bitcoin/regtest/.cookie
+        # Wait for RPC to be ready, then ensure wallet exists and mine initial block for electrs
+        sleep 2
+        bitcoin-cli -regtest -rpccookiefile=/data/.bitcoin/regtest/.cookie createwallet "regtest_wallet" 2>/dev/null || \
+          bitcoin-cli -regtest -rpccookiefile=/data/.bitcoin/regtest/.cookie loadwallet "regtest_wallet" 2>/dev/null || true
+        bitcoin-cli -regtest -rpccookiefile=/data/.bitcoin/regtest/.cookie -rpcwallet=regtest_wallet -generate 1 >/dev/null 2>&1 || true
+        # Create flag to signal permissions are set
+        touch /data/.bitcoin/regtest/.ready
+        # Background loop to keep permissions fixed (bitcoind may recreate cookie)
+        while kill -0 $BITCOIND_PID 2>/dev/null; do
+          chmod 755 /data/.bitcoin/regtest 2>/dev/null
+          chmod 644 /data/.bitcoin/regtest/.cookie 2>/dev/null
+          sleep 5
+        done &
+        # Keep container running by waiting on bitcoind
+        wait $BITCOIND_PID
+    volumes:
+      - bitcoin_data:/data/.bitcoin
+    # Ports only exposed internally via Docker network (no host binding to avoid conflicts)
+    expose:
+      - "18443"   # RPC
+      - "18444"   # P2P
+      - "28332"   # ZMQ blocks
+      - "28333"   # ZMQ transactions
+    networks:
+      - regtest_network
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /data/.bitcoin/regtest/.ready && chmod 644 /data/.bitcoin/regtest/.cookie && bitcoin-cli -regtest -rpccookiefile=/data/.bitcoin/regtest/.cookie getblockchaininfo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
-  web:
+  # Electrs - Electrum Server implementation
+  electrs:
+    image: getumbrel/electrs:v0.11.0
+    restart: unless-stopped
+    environment:
+      ELECTRS_ELECTRUM_RPC_ADDR: "0.0.0.0:50001"
+      ELECTRS_DAEMON_RPC_ADDR: "bitcoin:18443"
+      ELECTRS_DAEMON_P2P_ADDR: "bitcoin:18444"
+      ELECTRS_LOG_FILTERS: "INFO"
+      ELECTRS_NETWORK: "regtest"
+    volumes:
+      - electrs_data:/data
+      - bitcoin_data:/data/.bitcoin:ro
+    ports:
+      - "60401:50001"   # Electrum RPC (TCP) - uses 60401 to avoid conflict with Umbrel's Electrs
+    depends_on:
+      bitcoin:
+        condition: service_healthy
+    networks:
+      - regtest_network
+
+  # Bitcoin Regtest Dashboard
+  dashboard:
     build: .
     image: bitcoin-regtest-dashboard:latest
     restart: unless-stopped
     environment:
       PORT: 3000
-      BITCOIN_RPC_HOST: ${APP_BITCOIN_NODE_IP:-10.21.21.8}
-      BITCOIN_RPC_PORT: ${APP_BITCOIN_RPC_PORT:-18443}
-      BITCOIN_RPC_USER: ${APP_BITCOIN_RPC_USER:-umbrel}
-      BITCOIN_RPC_PASS: ${APP_BITCOIN_RPC_PASS:-moneyprintergobrrr}
+      BITCOIN_RPC_HOST: bitcoin
+      BITCOIN_RPC_PORT: 18443
+      BITCOIN_COOKIE_FILE: /bitcoin/.bitcoin/regtest/.cookie
+      ELECTRS_HOST: electrs
+      ELECTRS_PORT: 50001
+      ELECTRS_EXTERNAL_PORT: 60401
+    volumes:
+      - bitcoin_data:/bitcoin/.bitcoin:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      bitcoin:
+        condition: service_healthy
     networks:
-      default:
-        ipv4_address: 10.21.21.40
-    expose:
-      - "3000"
+      - regtest_network
+
+volumes:
+  bitcoin_data:
+  electrs_data:
 
 networks:
-  default:
-    name: umbrel_main_network
-    external: true
+  regtest_network:
+    driver: bridge

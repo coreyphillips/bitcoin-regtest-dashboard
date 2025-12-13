@@ -1,106 +1,86 @@
 # Bitcoin Regtest Dashboard
 
-An Umbrel app for interacting with your Bitcoin regtest node during development.
+A self-contained development tool for interacting with Bitcoin Core in regtest mode. Includes its own Bitcoin Core node and Electrs (Electrum Server) instance - no external dependencies required.
 
 ## Features
 
+- **Self-Contained**: Spins up its own Bitcoin Core regtest node and Electrs instance
 - **Mine Blocks**: Mine 1, 10, 100, or custom number of blocks instantly
 - **Send Bitcoin**: Send BTC to any address with RBF enabled by default
 - **Generate Addresses**: Create new addresses (bech32, bech32m, p2sh-segwit, legacy)
+- **Address Explorer**: Look up ANY address on the blockchain (powered by Electrs)
 - **RBF/Cancel Transactions**: Bump fees or cancel unconfirmed transactions
-- **View UTXOs**: See all unspent transaction outputs in your wallet
+- **View UTXOs**: See all unspent transaction outputs
 - **Mempool Explorer**: View pending transactions in the mempool
 - **Block Explorer**: Browse recent blocks and lookup by height/hash
 - **Raw Transactions**: Decode, broadcast, and test raw transactions
 - **RPC Console**: Execute any Bitcoin Core RPC command directly
 
-## Installation on Umbrel
+## Quick Start
 
-### Prerequisites
+### Using Docker Compose (Recommended)
 
-1. Umbrel OS running on your server
-2. Bitcoin Node app installed and running in **regtest mode**
+```bash
+# Clone the repository
+git clone https://github.com/coreyphillips/bitcoin-regtest-dashboard.git
+cd bitcoin-regtest-dashboard
 
-### Important: Configure Bitcoin for Regtest
+# Start all services (Bitcoin Core, Electrs, and Dashboard)
+docker-compose up -d
 
-Before installing this app, you need to configure your Bitcoin node to run in regtest mode. This requires modifying the Bitcoin configuration.
+# View logs
+docker-compose logs -f
+```
 
-#### Option 1: Community App Store (Recommended)
+**Access the dashboard at: http://localhost:3000**
 
-If this app is available in a community app store:
+### What Gets Started
+
+The docker-compose setup starts three services:
+
+| Service | Port | Description |
+|---------|------|-------------|
+| Bitcoin Core | 18443 | Bitcoin regtest node (RPC) |
+| Electrs | 50001, 3002 | Electrum server for address indexing |
+| Dashboard | 3000 | Web UI for interacting with the node |
+
+### Stopping Services
+
+```bash
+# Stop all services
+docker-compose down
+
+# Stop and remove all data (fresh start)
+docker-compose down -v
+```
+
+## Installation on Umbrel (Optional)
+
+If you prefer to use an existing Umbrel installation with Bitcoin Core already running:
+
+### Option 1: Community App Store
 
 1. Go to **Umbrel App Store**
 2. Search for "Bitcoin Regtest Dashboard"
 3. Click **Install**
 
-#### Option 2: Manual Installation
-
-Follow these steps to install the app manually on modern Umbrel (umbrelOS 1.0+):
-
-**Step 1: SSH into your Umbrel**
+### Option 2: Manual Installation
 
 ```bash
+# SSH into your Umbrel
 ssh umbrel@umbrel.local
-# Default password is usually: moneyprintergobrrr
-```
 
-**Step 2: Navigate to the app-data directory**
-
-```bash
+# Navigate to app-data directory
 cd ~/umbrel/app-data
-```
 
-**Step 3: Clone or copy the app**
-
-```bash
+# Clone the repository
 git clone https://github.com/coreyphillips/bitcoin-regtest-dashboard.git
-```
 
-Or transfer files from your local machine using `scp`:
-
-```bash
-# From your local machine (not on Umbrel)
-scp -r /path/to/bitcoin-regtest-dashboard umbrel@umbrel.local:~/umbrel/app-data/
-```
-
-**Step 4: Restart Umbrel**
-
-```bash
+# Restart Umbrel
 sudo reboot
 ```
 
-After reboot, the app should appear in your Umbrel dashboard.
-
-### Alternative: Using Docker Compose Directly
-
-If you want to run the dashboard without full Umbrel integration:
-
-**Step 1: Build the Docker image**
-
-```bash
-cd /path/to/bitcoin-regtest-dashboard
-docker build -t bitcoin-regtest-dashboard .
-```
-
-**Step 2: Run with Docker**
-
-```bash
-docker run -d \
-  --name bitcoin-regtest-dashboard \
-  -p 3000:3000 \
-  -e BITCOIN_RPC_HOST=<your-bitcoin-node-ip> \
-  -e BITCOIN_RPC_PORT=18443 \
-  -e BITCOIN_RPC_USER=umbrel \
-  -e BITCOIN_RPC_PASS=moneyprintergobrrr \
-  --network umbrel_main_network \
-  bitcoin-regtest-dashboard
-```
-
-Replace `<your-bitcoin-node-ip>` with your Bitcoin node's IP address.
-
-**Step 3: Access the dashboard**
-
-Open your browser and go to: `http://umbrel.local:3000` or `http://<umbrel-ip>:3000`
+**Note**: When using with Umbrel, configure environment variables to point to your existing Bitcoin node.
 
 ## Configuration
 
@@ -110,31 +90,39 @@ Open your browser and go to: `http://umbrel.local:3000` or `http://<umbrel-ip>:3
 |----------|---------|-------------|
 | `BITCOIN_RPC_HOST` | `bitcoin` | Bitcoin node hostname/IP |
 | `BITCOIN_RPC_PORT` | `18443` | RPC port (18443 for regtest) |
-| `BITCOIN_RPC_USER` | `umbrel` | RPC username |
-| `BITCOIN_RPC_PASS` | `moneyprintergobrrr` | RPC password |
+| `BITCOIN_RPC_USER` | `regtest` | RPC username |
+| `BITCOIN_RPC_PASS` | `regtest` | RPC password |
+| `ELECTRS_HOST` | `electrs` | Electrs hostname |
+| `ELECTRS_PORT` | `3002` | Electrs HTTP API port |
 | `PORT` | `3000` | Dashboard web server port |
 
-### Configuring Bitcoin Core for Regtest
+### Connecting to an External Bitcoin Node
 
-Your `bitcoin.conf` should include:
+To connect to an existing Bitcoin Core node instead of the bundled one:
+
+```bash
+docker run -d \
+  --name bitcoin-regtest-dashboard \
+  -p 3000:3000 \
+  -e BITCOIN_RPC_HOST=<your-bitcoin-node-ip> \
+  -e BITCOIN_RPC_PORT=18443 \
+  -e BITCOIN_RPC_USER=your_user \
+  -e BITCOIN_RPC_PASS=your_pass \
+  bitcoin-regtest-dashboard:latest
+```
+
+Your external Bitcoin Core `bitcoin.conf` should include:
 
 ```ini
-# Network
 regtest=1
 [regtest]
 rpcport=18443
 rpcbind=0.0.0.0
 rpcallowip=0.0.0.0/0
 server=1
-
-# RPC credentials
-rpcuser=umbrel
-rpcpassword=moneyprintergobrrr
-
-# Enable wallet
+rpcuser=your_user
+rpcpassword=your_pass
 disablewallet=0
-
-# Useful settings for development
 txindex=1
 fallbackfee=0.00001
 ```
@@ -149,112 +137,85 @@ The dashboard provides quick action buttons at the top:
 - **New Address**: Generate a new bech32 address (copies to clipboard)
 - **Refresh**: Manually refresh all dashboard data
 
-### Mining Tab
+### Explorer Tab (Electrs-Powered)
 
-- Enter the number of blocks to mine
-- Optionally specify a destination address
-- Click "Mine" to generate blocks
+The Explorer tab can look up **any address** on the blockchain, not just wallet addresses:
 
-### Wallet Tab
+- Enter any Bitcoin address to see its balance, transaction history, and UTXOs
+- Search for transaction IDs to view full transaction details
+- Data is fetched from Electrs for comprehensive blockchain indexing
 
-- **Send Bitcoin**: Send BTC to any address with optional RBF
-- **Generate Address**: Create addresses of any type with custom labels
-- **View Balance**: See confirmed and unconfirmed balances
-- **UTXOs**: List all unspent outputs
+### Status Indicators
 
-### Transactions Tab
+The header shows two status indicators:
 
-- **RBF - Bump Fee**: Increase the fee on an unconfirmed transaction
-- **Cancel TX**: Cancel an unconfirmed transaction (RBF to self)
-- **Lookup Transaction**: Get full details of any transaction
-- **Recent Transactions**: View your transaction history
-
-### Mempool Tab
-
-- View mempool statistics
-- List all pending transactions
-
-### Blocks Tab
-
-- Lookup blocks by height or hash
-- View recent blocks with transaction counts
-
-### Raw TX Tab
-
-- **Decode**: Parse raw transaction hex
-- **Broadcast**: Submit signed transactions to the network
-- **Test Accept**: Test if a transaction would be accepted without broadcasting
-
-### RPC Console Tab
-
-- Execute any Bitcoin Core RPC command
-- Quick buttons for common commands
-- Full JSON parameter support
+- **Bitcoin Core**: Shows connection status and network type
+- **Electrs**: Shows Electrs status and current block height
 
 ## API Endpoints
 
-The backend exposes a REST API you can use directly:
+### Bitcoin Core (via RPC)
 
-### Blockchain
 - `GET /api/blockchain/info` - Get blockchain info
 - `GET /api/block/:hash` - Get block by hash
 - `GET /api/block/height/:height` - Get block by height
-
-### Mining
 - `POST /api/mine` - Mine blocks `{ blocks: 1, address: "optional" }`
-
-### Wallet
 - `GET /api/wallet/balance` - Get wallet balance
 - `GET /api/wallet/utxos` - List UTXOs
-- `POST /api/wallet/newaddress` - Generate address `{ addressType: "bech32", label: "" }`
-- `POST /api/wallet/send` - Send BTC `{ address: "...", amount: 0.1, replaceable: true }`
-
-### Transactions
-- `GET /api/transaction/:txid` - Get transaction details
-- `POST /api/transaction/bumpfee` - Bump fee `{ txid: "..." }`
-- `POST /api/transaction/cancel` - Cancel transaction `{ txid: "..." }`
-- `POST /api/transaction/decode` - Decode raw tx `{ hex: "..." }`
-- `POST /api/transaction/send` - Broadcast raw tx `{ hex: "..." }`
-
-### Mempool
+- `POST /api/wallet/newaddress` - Generate address
+- `POST /api/wallet/send` - Send BTC
 - `GET /api/mempool/info` - Get mempool info
-- `GET /api/mempool/raw?verbose=true` - Get mempool transactions
+- `POST /api/rpc` - Execute any RPC command
 
-### Generic RPC
-- `POST /api/rpc` - Execute any RPC `{ method: "getblockchaininfo", params: [] }`
+### Electrs API
+
+- `GET /api/electrs/health` - Check Electrs status
+- `GET /api/electrs/address/:address` - Get address info (balance, tx count)
+- `GET /api/electrs/address/:address/txs` - Get address transactions
+- `GET /api/electrs/address/:address/utxo` - Get address UTXOs
+- `GET /api/electrs/tx/:txid` - Get transaction info
+- `GET /api/electrs/blocks/tip/height` - Get current block height
+- `GET /api/electrs/fee-estimates` - Get fee estimates
 
 ## Troubleshooting
 
-### "Connection failed" or "Disconnected"
-
-1. Ensure Bitcoin node is running: `docker ps | grep bitcoin`
-2. Check Bitcoin is in regtest mode
-3. Verify RPC credentials match your bitcoin.conf
-4. Check network connectivity between containers
-
-### "Wallet not found" errors
-
-The app will automatically create a wallet named `regtest_wallet` on first use. If you see errors:
+### Services Won't Start
 
 ```bash
-# SSH into Umbrel and access Bitcoin CLI
-docker exec -it bitcoin_bitcoind_1 bitcoin-cli -regtest createwallet "regtest_wallet"
+# Check service status
+docker-compose ps
+
+# View logs for specific service
+docker-compose logs bitcoin
+docker-compose logs electrs
+docker-compose logs dashboard
 ```
 
-### Cannot mine blocks
+### Electrs Shows "Off" Status
 
-Make sure your Bitcoin node has a wallet loaded:
+Electrs needs Bitcoin Core to be fully synced before it can start indexing. On first startup:
+
+1. Wait for Bitcoin Core to initialize (check logs: `docker-compose logs bitcoin`)
+2. Electrs will start indexing once Bitcoin Core is ready
+3. This may take a minute on first boot
+
+### "Wallet not found" Errors
+
+The dashboard automatically creates a wallet named `regtest_wallet` on first use. If issues persist:
 
 ```bash
-docker exec -it bitcoin_bitcoind_1 bitcoin-cli -regtest listwallets
+# Access Bitcoin CLI directly
+docker-compose exec bitcoin bitcoin-cli -regtest createwallet "regtest_wallet"
 ```
 
-### Permission denied errors
-
-Ensure the app has proper permissions:
+### Reset Everything
 
 ```bash
-chmod -R 755 ~/umbrel/app-data/bitcoin-regtest-dashboard
+# Stop services and remove all data
+docker-compose down -v
+
+# Start fresh
+docker-compose up -d
 ```
 
 ## Development
@@ -269,14 +230,34 @@ npm install
 # Set environment variables
 export BITCOIN_RPC_HOST=localhost
 export BITCOIN_RPC_PORT=18443
-export BITCOIN_RPC_USER=your_user
-export BITCOIN_RPC_PASS=your_pass
+export BITCOIN_RPC_USER=regtest
+export BITCOIN_RPC_PASS=regtest
+export ELECTRS_HOST=localhost
+export ELECTRS_PORT=3002
 
 # Run the server
 npm start
 ```
 
 Then open `http://localhost:3000` in your browser.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Docker Compose Network                    │
+│                                                              │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
+│  │ Bitcoin Core │◄───│   Electrs    │    │  Dashboard   │  │
+│  │   (regtest)  │    │   (indexer)  │◄───│   (Web UI)   │  │
+│  │  Port 18443  │    │  Port 3002   │    │  Port 3000   │  │
+│  └──────────────┘    └──────────────┘    └──────────────┘  │
+│         ▲                   ▲                   │           │
+│         │                   │                   │           │
+│         └───────────────────┴───────────────────┘           │
+│                    RPC / HTTP API                            │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ## License
 
