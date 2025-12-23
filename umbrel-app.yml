@@ -4,7 +4,7 @@ name: Bitcoin Regtest Dashboard
 tagline: Development toolkit for Bitcoin regtest
 icon: https://raw.githubusercontent.com/coreyphillips/bitcoin-regtest-dashboard/main/icon.svg
 category: developer-tools
-version: "1.0.1"
+version: "1.0.2"
 port: 3000
 description: >-
   A self-contained development dashboard with its own Bitcoin Core regtest node and Electrs instance. No external dependencies required.

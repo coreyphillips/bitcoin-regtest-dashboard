@@ -10,7 +10,7 @@
 services:
   # Bitcoin Core in regtest mode (uses cookie auth)
   bitcoin:
-    image: getumbrel/bitcoind:v28.1
+    image: ghcr.io/getumbrel/docker-bitcoind:v30.0
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c"]
     command:
