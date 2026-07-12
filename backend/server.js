@@ -248,37 +248,38 @@ app.get('/api/mempool/raw', async (req, res) => {
   }
 });
 
+// Resolve a usable mining address: use the provided one, otherwise get a fresh
+// wallet address (creating/loading the wallet if needed).
+async function resolveMiningAddress(address) {
+  if (address) return address;
+
+  try {
+    return await bitcoinRPC('getnewaddress', ['mining', 'bech32'], true);
+  } catch (e) {
+    // If wallet doesn't exist, create one
+    if (e.message.includes('wallet')) {
+      try {
+        await bitcoinRPC('createwallet', ['regtest_wallet']);
+        return await bitcoinRPC('getnewaddress', ['mining', 'bech32'], true);
+      } catch (walletError) {
+        // Wallet might already exist, try loading it
+        try {
+          await bitcoinRPC('loadwallet', ['regtest_wallet']);
+          return await bitcoinRPC('getnewaddress', ['mining', 'bech32'], true);
+        } catch (loadError) {
+          throw new Error('Could not create or load wallet: ' + loadError.message);
+        }
+      }
+    }
+    throw e;
+  }
+}
+
 // Mine blocks to address
 app.post('/api/mine', async (req, res) => {
   try {
     const { blocks = 1, address } = req.body;
-
-    let miningAddress = address;
-
-    // If no address provided, create a new one from the wallet
-    if (!miningAddress) {
-      try {
-        miningAddress = await bitcoinRPC('getnewaddress', ['mining', 'bech32'], true);
-      } catch (e) {
-        // If wallet doesn't exist, create one
-        if (e.message.includes('wallet')) {
-          try {
-            await bitcoinRPC('createwallet', ['regtest_wallet']);
-            miningAddress = await bitcoinRPC('getnewaddress', ['mining', 'bech32'], true);
-          } catch (walletError) {
-            // Wallet might already exist, try loading it
-            try {
-              await bitcoinRPC('loadwallet', ['regtest_wallet']);
-              miningAddress = await bitcoinRPC('getnewaddress', ['mining', 'bech32'], true);
-            } catch (loadError) {
-              throw new Error('Could not create or load wallet: ' + loadError.message);
-            }
-          }
-        } else {
-          throw e;
-        }
-      }
-    }
+    const miningAddress = await resolveMiningAddress(address);
 
     const blockHashes = await bitcoinRPC('generatetoaddress', [parseInt(blocks), miningAddress]);
     res.json({
@@ -290,6 +291,145 @@ app.post('/api/mine', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Auto-mine: a single server-side job that mines blocks at a fixed interval.
+// By default it runs indefinitely until stopped; an optional duration makes it
+// stop on its own at the deadline. It runs independently of any browser tab, so
+// mining continues even if the dashboard is closed. Only one job at a time.
+// ---------------------------------------------------------------------------
+let autoMineJob = null;
+
+function autoMineStatus() {
+  if (!autoMineJob) return { running: false };
+  const indefinite = !autoMineJob.endsAt;
+  const remainingSeconds = indefinite
+    ? null
+    : Math.max(0, Math.round((autoMineJob.endsAt - Date.now()) / 1000));
+  return {
+    running: true,
+    blocksMined: autoMineJob.blocksMined,
+    indefinite: indefinite,
+    remainingSeconds: remainingSeconds,
+    intervalSeconds: autoMineJob.intervalSeconds,
+    blocksPerTick: autoMineJob.blocksPerTick,
+    address: autoMineJob.address,
+    startedAt: autoMineJob.startedAt,
+    lastError: autoMineJob.lastError || null
+  };
+}
+
+function stopAutoMine() {
+  if (autoMineJob) {
+    if (autoMineJob.timer) clearInterval(autoMineJob.timer);
+    if (autoMineJob.stopTimer) clearTimeout(autoMineJob.stopTimer);
+  }
+  autoMineJob = null;
+}
+
+async function autoMineTick() {
+  const job = autoMineJob;
+  if (!job) return;
+
+  // Stop cleanly once the deadline has passed (only when a duration is set)
+  if (job.endsAt && Date.now() >= job.endsAt) {
+    stopAutoMine();
+    return;
+  }
+
+  // Skip if the previous tick is still mining (can happen with large batches)
+  if (job.ticking) return;
+  job.ticking = true;
+  try {
+    const hashes = await bitcoinRPC('generatetoaddress', [job.blocksPerTick, job.address]);
+    job.blocksMined += Array.isArray(hashes) ? hashes.length : 0;
+    job.lastError = null;
+  } catch (e) {
+    job.lastError = e.message;
+    console.error(`Auto-mine tick error: ${e.message}`);
+  } finally {
+    if (autoMineJob === job) job.ticking = false;
+  }
+}
+
+// Start an auto-mine job
+app.post('/api/mine/auto/start', async (req, res) => {
+  try {
+    if (autoMineJob) {
+      return res.status(409).json({ error: 'Auto-mine is already running. Stop it first.' });
+    }
+
+    // Duration is optional: when omitted the job runs until it is stopped.
+    const durationRaw = req.body.durationMinutes;
+    const hasDuration = durationRaw !== undefined && durationRaw !== null && durationRaw !== '';
+    const durationMinutes = hasDuration ? parseInt(durationRaw, 10) : null;
+    const intervalSeconds = parseInt(req.body.intervalSeconds, 10);
+    const blocksPerTick = parseInt(req.body.blocks, 10) || 1;
+    const address = req.body.address || null;
+
+    if (hasDuration && (!Number.isFinite(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440)) {
+      return res.status(400).json({ error: 'Duration must be between 1 and 1440 minutes' });
+    }
+    if (!Number.isFinite(intervalSeconds) || intervalSeconds < 1) {
+      return res.status(400).json({ error: 'Interval must be at least 1 second' });
+    }
+    if (blocksPerTick < 1 || blocksPerTick > 1000) {
+      return res.status(400).json({ error: 'Blocks per tick must be between 1 and 1000' });
+    }
+
+    // Resolve the mining address once and reuse it for the whole run so the
+    // coinbase rewards land on a single address instead of being scattered.
+    const miningAddress = await resolveMiningAddress(address);
+
+    const now = Date.now();
+    const endsAt = durationMinutes ? now + durationMinutes * 60000 : null;
+    autoMineJob = {
+      timer: null,
+      stopTimer: null,
+      startedAt: now,
+      endsAt: endsAt,
+      intervalSeconds: intervalSeconds,
+      blocksPerTick: blocksPerTick,
+      address: miningAddress,
+      blocksMined: 0,
+      ticking: false,
+      lastError: null
+    };
+    console.log(`Auto-mine started: ${durationMinutes ? durationMinutes + 'm' : 'until stopped'}, every ${intervalSeconds}s, ${blocksPerTick} block(s)/tick to ${miningAddress}`);
+
+    // Mine one batch immediately for instant feedback, then on the interval
+    await autoMineTick();
+    if (autoMineJob) {
+      autoMineJob.timer = setInterval(autoMineTick, intervalSeconds * 1000);
+      // With a duration set, hard stop exactly at the deadline regardless of
+      // interval size. Without one, the job keeps running until stopped.
+      if (endsAt) {
+        autoMineJob.stopTimer = setTimeout(() => {
+          console.log(`Auto-mine finished: ${autoMineJob ? autoMineJob.blocksMined : 0} block(s) mined`);
+          stopAutoMine();
+        }, endsAt - Date.now());
+      }
+    }
+
+    res.json(autoMineStatus());
+  } catch (error) {
+    stopAutoMine();
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Stop the auto-mine job
+app.post('/api/mine/auto/stop', (req, res) => {
+  const wasRunning = !!autoMineJob;
+  const blocksMined = autoMineJob ? autoMineJob.blocksMined : 0;
+  stopAutoMine();
+  res.json({ running: false, stopped: wasRunning, blocksMined: blocksMined });
+});
+
+// Get auto-mine status
+app.get('/api/mine/auto/status', (req, res) => {
+  res.json(autoMineStatus());
 });
 
 // Get wallet info
