@@ -861,6 +861,35 @@
           </div>
         </div>
       </div>
+
+      <div class="card regtest-only" id="autoMineCard">
+        <h2>Auto Mine</h2>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+          Continuously mine blocks for a set duration. This runs on the server, so mining keeps going even if you close this tab, and stops automatically when the time is up.
+        </p>
+        <div class="inline-form">
+          <div class="form-group">
+            <label>Duration (minutes)</label>
+            <input type="number" id="autoMineDuration" value="10" min="1" max="1440">
+          </div>
+          <div class="form-group">
+            <label>Mine Every (seconds)</label>
+            <input type="number" id="autoMineInterval" value="10" min="1">
+          </div>
+          <div class="form-group">
+            <label>Blocks Per Tick</label>
+            <input type="number" id="autoMineBlocks" value="1" min="1" max="1000">
+          </div>
+          <div class="form-group">
+            <label>To Address (optional)</label>
+            <input type="text" id="autoMineAddress" placeholder="Leave empty for wallet address">
+          </div>
+          <button class="btn btn-primary" id="autoMineStartBtn" onclick="startAutoMine()">Start Auto Mine</button>
+          <button class="btn btn-danger" id="autoMineStopBtn" onclick="stopAutoMine()" style="display:none;">Stop</button>
+        </div>
+        <div id="autoMineStatus" class="empty-state" style="margin-top: 16px;">Not running</div>
+        <div id="autoMineResult" class="result-box" style="display:none;"></div>
+      </div>
     </div>
 
     <!-- Wallet Tab -->
@@ -1457,6 +1486,112 @@
       const count = document.getElementById('mineBlockCount').value;
       const address = document.getElementById('mineToAddress').value || null;
       mineBlocks(parseInt(count), address);
+    }
+
+    // ---- Auto Mine ----
+    let autoMinePollTimer = null;
+    let autoMineLastBlocks = 0;
+    let autoMinePrevRunning = false;
+
+    async function startAutoMine() {
+      const durationMinutes = parseInt(document.getElementById('autoMineDuration').value, 10);
+      const intervalSeconds = parseInt(document.getElementById('autoMineInterval').value, 10);
+      const blocks = parseInt(document.getElementById('autoMineBlocks').value, 10);
+      const address = document.getElementById('autoMineAddress').value || null;
+      try {
+        const status = await api('/mine/auto/start', {
+          method: 'POST',
+          body: JSON.stringify({ durationMinutes, intervalSeconds, blocks, address })
+        });
+        document.getElementById('autoMineResult').style.display = 'none';
+        autoMineLastBlocks = 0;
+        autoMinePrevRunning = true;
+        applyAutoMineStatus(status);
+        startAutoMinePolling();
+      } catch (error) {
+        showResult('autoMineResult', error.message, true);
+      }
+    }
+
+    async function stopAutoMine() {
+      try {
+        await api('/mine/auto/stop', { method: 'POST' });
+      } catch (error) {
+        // Ignore and refresh status below regardless
+      }
+      stopAutoMinePolling();
+      await refreshAutoMineStatus();
+      refreshStats();
+      loadMiningInfo();
+      loadRecentBlocks();
+    }
+
+    function startAutoMinePolling() {
+      if (autoMinePollTimer) return;
+      autoMinePollTimer = setInterval(refreshAutoMineStatus, 2000);
+    }
+
+    function stopAutoMinePolling() {
+      if (autoMinePollTimer) {
+        clearInterval(autoMinePollTimer);
+        autoMinePollTimer = null;
+      }
+    }
+
+    function formatDuration(totalSeconds) {
+      const m = Math.floor(totalSeconds / 60);
+      const s = totalSeconds % 60;
+      return `${m}m ${s}s`;
+    }
+
+    function applyAutoMineStatus(status) {
+      const statusEl = document.getElementById('autoMineStatus');
+      const startBtn = document.getElementById('autoMineStartBtn');
+      const stopBtn = document.getElementById('autoMineStopBtn');
+
+      if (status && status.running) {
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-flex';
+        let text = `Running - ${status.blocksMined} block(s) mined, ${formatDuration(status.remainingSeconds)} left`;
+        if (status.lastError) text += ` (last error: ${status.lastError})`;
+        statusEl.textContent = text;
+        statusEl.className = '';
+        statusEl.style.color = 'var(--accent-green)';
+
+        // Refresh the block panels when new blocks appear
+        if (status.blocksMined > autoMineLastBlocks) {
+          autoMineLastBlocks = status.blocksMined;
+          refreshStats();
+          loadMiningInfo();
+          loadRecentBlocks();
+        }
+      } else {
+        startBtn.style.display = 'inline-flex';
+        stopBtn.style.display = 'none';
+        statusEl.className = 'empty-state';
+        statusEl.style.color = '';
+        statusEl.textContent = 'Not running';
+      }
+    }
+
+    async function refreshAutoMineStatus() {
+      try {
+        const status = await api('/mine/auto/status');
+        applyAutoMineStatus(status);
+        if (status.running) {
+          startAutoMinePolling();
+        } else {
+          stopAutoMinePolling();
+          if (autoMinePrevRunning) {
+            refreshStats();
+            loadMiningInfo();
+            loadRecentBlocks();
+          }
+        }
+        autoMinePrevRunning = !!status.running;
+      } catch (error) {
+        // Leave the current UI as-is on a transient error
+      }
     }
 
     // Generate new address
@@ -2758,6 +2893,8 @@
       loadTheme();
       updateThemeButtonVisibility();
       refreshAll();
+      // Reflect an auto-mine job that may already be running on the server
+      refreshAutoMineStatus();
       // Auto-refresh every 10 seconds
       setInterval(refreshStats, 10000);
       setInterval(checkConnection, 30000);

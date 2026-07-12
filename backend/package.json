@@ -1,6 +1,6 @@
 {
   "name": "bitcoin-regtest-dashboard-backend",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Backend API for Bitcoin Regtest Dashboard",
   "main": "server.js",
   "scripts": {
