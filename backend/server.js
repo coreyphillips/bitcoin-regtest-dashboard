@@ -294,19 +294,23 @@ app.post('/api/mine', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Auto-mine: a single server-side job that mines blocks at a fixed interval
-// for a set duration. It runs independently of any browser tab, so mining
-// continues even if the dashboard is closed, and stops on its own at the
-// deadline. Only one job can run at a time.
+// Auto-mine: a single server-side job that mines blocks at a fixed interval.
+// By default it runs indefinitely until stopped; an optional duration makes it
+// stop on its own at the deadline. It runs independently of any browser tab, so
+// mining continues even if the dashboard is closed. Only one job at a time.
 // ---------------------------------------------------------------------------
 let autoMineJob = null;
 
 function autoMineStatus() {
   if (!autoMineJob) return { running: false };
-  const remainingSeconds = Math.max(0, Math.round((autoMineJob.endsAt - Date.now()) / 1000));
+  const indefinite = !autoMineJob.endsAt;
+  const remainingSeconds = indefinite
+    ? null
+    : Math.max(0, Math.round((autoMineJob.endsAt - Date.now()) / 1000));
   return {
     running: true,
     blocksMined: autoMineJob.blocksMined,
+    indefinite: indefinite,
     remainingSeconds: remainingSeconds,
     intervalSeconds: autoMineJob.intervalSeconds,
     blocksPerTick: autoMineJob.blocksPerTick,
@@ -328,8 +332,8 @@ async function autoMineTick() {
   const job = autoMineJob;
   if (!job) return;
 
-  // Stop cleanly once the deadline has passed
-  if (Date.now() >= job.endsAt) {
+  // Stop cleanly once the deadline has passed (only when a duration is set)
+  if (job.endsAt && Date.now() >= job.endsAt) {
     stopAutoMine();
     return;
   }
@@ -356,12 +360,15 @@ app.post('/api/mine/auto/start', async (req, res) => {
       return res.status(409).json({ error: 'Auto-mine is already running. Stop it first.' });
     }
 
-    const durationMinutes = parseInt(req.body.durationMinutes, 10);
+    // Duration is optional: when omitted the job runs until it is stopped.
+    const durationRaw = req.body.durationMinutes;
+    const hasDuration = durationRaw !== undefined && durationRaw !== null && durationRaw !== '';
+    const durationMinutes = hasDuration ? parseInt(durationRaw, 10) : null;
     const intervalSeconds = parseInt(req.body.intervalSeconds, 10);
     const blocksPerTick = parseInt(req.body.blocks, 10) || 1;
     const address = req.body.address || null;
 
-    if (!Number.isFinite(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440) {
+    if (hasDuration && (!Number.isFinite(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440)) {
       return res.status(400).json({ error: 'Duration must be between 1 and 1440 minutes' });
     }
     if (!Number.isFinite(intervalSeconds) || intervalSeconds < 1) {
@@ -376,11 +383,12 @@ app.post('/api/mine/auto/start', async (req, res) => {
     const miningAddress = await resolveMiningAddress(address);
 
     const now = Date.now();
+    const endsAt = durationMinutes ? now + durationMinutes * 60000 : null;
     autoMineJob = {
       timer: null,
       stopTimer: null,
       startedAt: now,
-      endsAt: now + durationMinutes * 60000,
+      endsAt: endsAt,
       intervalSeconds: intervalSeconds,
       blocksPerTick: blocksPerTick,
       address: miningAddress,
@@ -388,17 +396,20 @@ app.post('/api/mine/auto/start', async (req, res) => {
       ticking: false,
       lastError: null
     };
-    console.log(`Auto-mine started: ${durationMinutes}m, every ${intervalSeconds}s, ${blocksPerTick} block(s)/tick to ${miningAddress}`);
+    console.log(`Auto-mine started: ${durationMinutes ? durationMinutes + 'm' : 'until stopped'}, every ${intervalSeconds}s, ${blocksPerTick} block(s)/tick to ${miningAddress}`);
 
     // Mine one batch immediately for instant feedback, then on the interval
     await autoMineTick();
     if (autoMineJob) {
       autoMineJob.timer = setInterval(autoMineTick, intervalSeconds * 1000);
-      // Hard stop exactly at the deadline regardless of interval size
-      autoMineJob.stopTimer = setTimeout(() => {
-        console.log(`Auto-mine finished: ${autoMineJob ? autoMineJob.blocksMined : 0} block(s) mined`);
-        stopAutoMine();
-      }, autoMineJob.endsAt - Date.now());
+      // With a duration set, hard stop exactly at the deadline regardless of
+      // interval size. Without one, the job keeps running until stopped.
+      if (endsAt) {
+        autoMineJob.stopTimer = setTimeout(() => {
+          console.log(`Auto-mine finished: ${autoMineJob ? autoMineJob.blocksMined : 0} block(s) mined`);
+          stopAutoMine();
+        }, endsAt - Date.now());
+      }
     }
 
     res.json(autoMineStatus());

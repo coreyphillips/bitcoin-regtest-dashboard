@@ -865,12 +865,12 @@
       <div class="card regtest-only" id="autoMineCard">
         <h2>Auto Mine</h2>
         <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
-          Continuously mine blocks for a set duration. This runs on the server, so mining keeps going even if you close this tab, and stops automatically when the time is up.
+          Continuously mine blocks at a set interval. This runs on the server, so mining keeps going even if you close this tab. Leave the duration empty to mine until you stop it, or set one to stop automatically when the time is up.
         </p>
         <div class="inline-form">
           <div class="form-group">
-            <label>Duration (minutes)</label>
-            <input type="number" id="autoMineDuration" value="10" min="1" max="1440">
+            <label>Duration (minutes, optional)</label>
+            <input type="number" id="autoMineDuration" placeholder="Run until stopped" min="1" max="1440">
           </div>
           <div class="form-group">
             <label>Mine Every (seconds)</label>
@@ -1494,14 +1494,17 @@
     let autoMinePrevRunning = false;
 
     async function startAutoMine() {
-      const durationMinutes = parseInt(document.getElementById('autoMineDuration').value, 10);
+      const durationRaw = document.getElementById('autoMineDuration').value.trim();
       const intervalSeconds = parseInt(document.getElementById('autoMineInterval').value, 10);
       const blocks = parseInt(document.getElementById('autoMineBlocks').value, 10);
       const address = document.getElementById('autoMineAddress').value || null;
+      const payload = { intervalSeconds, blocks, address };
+      // Only send a duration if one was entered; empty means run until stopped
+      if (durationRaw !== '') payload.durationMinutes = parseInt(durationRaw, 10);
       try {
         const status = await api('/mine/auto/start', {
           method: 'POST',
-          body: JSON.stringify({ durationMinutes, intervalSeconds, blocks, address })
+          body: JSON.stringify(payload)
         });
         document.getElementById('autoMineResult').style.display = 'none';
         autoMineLastBlocks = 0;
@@ -1552,7 +1555,12 @@
       if (status && status.running) {
         startBtn.style.display = 'none';
         stopBtn.style.display = 'inline-flex';
-        let text = `Running - ${status.blocksMined} block(s) mined, ${formatDuration(status.remainingSeconds)} left`;
+        let text;
+        if (status.indefinite || status.remainingSeconds === null) {
+          text = `Running - ${status.blocksMined} block(s) mined, running until stopped`;
+        } else {
+          text = `Running - ${status.blocksMined} block(s) mined, ${formatDuration(status.remainingSeconds)} left`;
+        }
         if (status.lastError) text += ` (last error: ${status.lastError})`;
         statusEl.textContent = text;
         statusEl.className = '';

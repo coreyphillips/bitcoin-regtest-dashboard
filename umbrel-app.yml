@@ -14,7 +14,7 @@ description: >-
 
   - Mine blocks instantly with one click
 
-  - Auto-mine blocks for a set duration
+  - Auto-mine blocks until stopped or for a set duration
 
   - Generate new addresses (all types supported)
 
@@ -49,7 +49,7 @@ gallery:
   - https://raw.githubusercontent.com/coreyphillips/bitcoin-regtest-dashboard/main/gallery/screenshot3.png
   - https://raw.githubusercontent.com/coreyphillips/bitcoin-regtest-dashboard/main/gallery/screenshot4.png
 releaseNotes: >-
-  - Added an auto-mine feature to mine blocks at a set interval for a chosen duration
+  - Added an auto-mine feature to mine blocks at a set interval, either until stopped or for a chosen duration
 
   - Upgraded Bitcoin Core to v31.0
 dependencies: []
