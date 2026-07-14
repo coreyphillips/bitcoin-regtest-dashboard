@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-glass="off">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1303,11 +1303,13 @@
     }
   </style>
   <script>
-    // Apply the saved glass choice before the first paint, so turning the effect
-    // off does not flash a frosted frame on every load.
+    // Glass is off on a first visit (the attribute on <html> is the default) and
+    // only switches on for someone who has previously turned it on. Applying the
+    // saved choice here, before the first paint, keeps the effect from flashing
+    // in and out on every load.
     try {
-      if (localStorage.getItem('dashboardGlass') === 'off') {
-        document.documentElement.setAttribute('data-glass', 'off');
+      if (localStorage.getItem('dashboardGlass') === 'on') {
+        document.documentElement.setAttribute('data-glass', 'on');
       }
     } catch (e) { /* storage unavailable, keep the default */ }
   </script>
@@ -1361,7 +1363,7 @@
           <span class="switch-hint">Frosted cards, glow and wallpaper</span>
         </div>
         <button type="button" class="switch" id="glassToggle" role="switch"
-                aria-checked="true" aria-label="Glass Effect" onclick="toggleGlass()"></button>
+                aria-checked="false" aria-label="Glass Effect" onclick="toggleGlass()"></button>
       </div>
 
       <div class="theme-presets">
@@ -3523,7 +3525,7 @@
 
     function resetTheme() {
       localStorage.removeItem('dashboardTheme');
-      setGlass(true);
+      setGlass(false);
       updateColor('accent', defaultTheme.accent);
       updateColor('bg', defaultTheme.bg);
       updateColor('card', defaultTheme.card);
