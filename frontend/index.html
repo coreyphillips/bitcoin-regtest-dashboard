@@ -5,17 +5,179 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bitcoin Regtest Dashboard</title>
   <style>
+    /* ============================================================
+       Design tokens.
+
+       The theme panel's four colors (accent, background, card, text)
+       still drive everything. JS mirrors each one into an "-rgb" triplet
+       so the glass layers can restate it at any alpha, and the accent is
+       reused as the glow that sits under the cards and in the wallpaper.
+       ============================================================ */
     :root {
+      /* Theme colors, rewritten at runtime by the theme panel */
+      --accent-orange: #3b82f6;
+      --accent-2: #59a0ff;
       --bg-primary: #0a0f17;
       --bg-secondary: #111827;
-      --bg-tertiary: #1f2937;
-      --border-color: #374151;
+      --bg-tertiary: #1e2333;
+      --border-color: #2d3243;
       --text-primary: #f0f6fc;
       --text-secondary: #8b949e;
-      --accent-orange: #3b82f6;
-      --accent-green: #238636;
-      --accent-red: #da3633;
-      --accent-blue: #58a6ff;
+
+      /* Channel triplets for the same colors, so alpha can vary */
+      --accent-rgb: 59, 130, 246;
+      --bg-rgb: 10, 15, 23;
+      --card-rgb: 17, 24, 39;
+      --text-rgb: 240, 246, 252;
+
+      /* Accent companions for the wallpaper mesh (accent, hue +130, hue -110) */
+      --glow-a-rgb: 59, 130, 246;
+      --glow-b-rgb: 59, 246, 130;
+      --glow-c-rgb: 246, 59, 130;
+
+      /* Readable text on top of a filled accent surface */
+      --accent-contrast: #06101f;
+
+      /* Semantic colors */
+      --accent-green: #3ddc97;
+      --accent-red: #ff5c61;
+      --accent-yellow: #f0c23f;
+      --accent-blue: #6ea8ff;
+      --green-rgb: 61, 220, 151;
+      --red-rgb: 255, 92, 97;
+      --yellow-rgb: 240, 194, 63;
+
+      /* Glass */
+      --glass-bg: rgba(var(--card-rgb), 0.52);
+      --glass-bg-heavy: rgba(var(--card-rgb), 0.85);
+      /* Sheen laid over the glass, plus a faint wash of accent so the tint
+         carries across the pane rather than only where the mesh sits behind it */
+      --glass-sheen: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.05),
+        rgba(255, 255, 255, 0.015) 38%,
+        rgba(255, 255, 255, 0) 60%
+      );
+      --glass-tint: linear-gradient(
+        160deg,
+        rgba(var(--accent-rgb), 0.045),
+        rgba(var(--accent-rgb), 0.01) 55%,
+        transparent
+      );
+      /* Accent light bleeding in through the pane's edges */
+      --glass-inner-glow: inset 0 0 60px -42px rgba(var(--accent-rgb), 0.55);
+      --glass-inner: rgba(255, 255, 255, 0.04);
+      --glass-inner-2: rgba(255, 255, 255, 0.07);
+      --glass-border: rgba(255, 255, 255, 0.09);
+      --glass-border-bright: rgba(255, 255, 255, 0.18);
+      --hairline: rgba(255, 255, 255, 0.06);
+      --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+      --blur: 26px;
+      --blur-soft: 10px;
+      /* A light touch of saturation and brightness is what sells the frost: it
+         pulls the wallpaper's color forward instead of letting the pane mute it */
+      --glass-filter: blur(var(--blur)) saturate(150%) brightness(1.04);
+
+      /* Accent glow, the colored bloom under the glass */
+      --accent-glow: rgba(var(--accent-rgb), 0.35);
+      --accent-dim: rgba(var(--accent-rgb), 0.12);
+      --card-glow: 0 18px 44px -22px rgba(var(--accent-rgb), 0.3);
+      --card-glow-hover: 0 22px 56px -20px rgba(var(--accent-rgb), 0.5);
+      --spotlight: rgba(var(--accent-rgb), 0.05);
+
+      /* Shape + motion */
+      --r-sm: 10px;
+      --r-md: 16px;
+      --r-lg: 22px;
+      --r-full: 999px;
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --dur-fast: 150ms;
+      --dur-med: 300ms;
+
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+      color-scheme: dark;
+    }
+
+    /* Light themes need darker hairlines and stronger semantics to stay legible
+       against pale glass. JS flips data-theme from the background's luminance. */
+    :root[data-theme="light"] {
+      --accent-green: #0f9d63;
+      --accent-red: #d93a40;
+      --accent-yellow: #b8890b;
+      --accent-blue: #2f6fdb;
+      --green-rgb: 15, 157, 99;
+      --red-rgb: 217, 58, 64;
+      --yellow-rgb: 184, 137, 11;
+
+      --glass-bg: rgba(var(--card-rgb), 0.58);
+      --glass-bg-heavy: rgba(var(--card-rgb), 0.88);
+      --glass-sheen: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.35),
+        rgba(255, 255, 255, 0.1) 40%,
+        rgba(255, 255, 255, 0) 65%
+      );
+      --glass-tint: linear-gradient(
+        160deg,
+        rgba(var(--accent-rgb), 0.04),
+        rgba(var(--accent-rgb), 0.01) 55%,
+        transparent
+      );
+      --glass-inner-glow: inset 0 0 60px -44px rgba(var(--accent-rgb), 0.45);
+      /* Pale glass needs almost no brightening or it blows out to flat white */
+      --glass-filter: blur(var(--blur)) saturate(140%) brightness(1.01);
+      --glass-inner: rgba(20, 30, 60, 0.045);
+      --glass-inner-2: rgba(20, 30, 60, 0.08);
+      --glass-border: rgba(20, 30, 60, 0.1);
+      --glass-border-bright: rgba(20, 30, 60, 0.2);
+      --hairline: rgba(20, 30, 60, 0.08);
+      --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+      --glass-shadow: 0 8px 32px rgba(35, 45, 80, 0.12);
+
+      --card-glow: 0 18px 44px -22px rgba(var(--accent-rgb), 0.45);
+      --card-glow-hover: 0 22px 56px -20px rgba(var(--accent-rgb), 0.65);
+      --spotlight: rgba(var(--accent-rgb), 0.07);
+
+      color-scheme: light;
+    }
+
+    /* ---------- Glass off ----------
+       Neutralizing the tokens turns every glass surface opaque and drops the
+       blurs, glows and wallpaper. Cheaper to render, and the theme colors keep
+       working exactly as before. */
+    :root[data-glass="off"] {
+      --glass-bg: rgb(var(--card-rgb));
+      --glass-bg-heavy: rgb(var(--card-rgb));
+      --glass-sheen: none;
+      --glass-tint: none;
+      --glass-filter: none;
+      --glass-inner-glow: 0 0 0 0 transparent;
+      --card-glow: 0 0 0 0 transparent;
+      --card-glow-hover: 0 0 0 0 transparent;
+      --spotlight: transparent;
+      --glass-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+      --glass-highlight: 0 0 0 0 transparent;
+    }
+
+    :root[data-glass="off"] .ambient::before,
+    :root[data-glass="off"] .ambient::after {
+      display: none;
+    }
+
+    :root[data-glass="off"] .stat-card .value {
+      text-shadow: none;
+    }
+
+    :root[data-glass="off"] .quick-action-btn svg {
+      filter: none;
+    }
+
+    :root[data-glass="off"] .theme-panel-overlay,
+    :root[data-glass="off"] .modal-overlay {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
     }
 
     * {
@@ -26,9 +188,160 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background-color: var(--bg-primary);
+      background: var(--bg-primary);
       color: var(--text-primary);
       line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    ::selection {
+      background: rgba(var(--accent-rgb), 0.3);
+    }
+
+    :focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--glass-inner-2);
+      border-radius: var(--r-full);
+      border: 3px solid transparent;
+      background-clip: content-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--glass-border-bright);
+      border: 3px solid transparent;
+      background-clip: content-box;
+    }
+
+    /* ---------- Ambient wallpaper ----------
+       A fixed gradient mesh tinted with the accent and two hue companions.
+       Everything glassy blurs this layer, which is what makes the theme
+       color read through the cards. */
+    .ambient {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      overflow: hidden;
+      background: var(--bg-primary);
+    }
+
+    .ambient::before {
+      content: '';
+      position: absolute;
+      inset: -20%;
+      background:
+        radial-gradient(40% 48% at 14% 10%, rgba(var(--glow-a-rgb), 0.20), transparent 70%),
+        radial-gradient(46% 56% at 88% 20%, rgba(var(--glow-b-rgb), 0.17), transparent 70%),
+        radial-gradient(52% 58% at 50% 102%, rgba(var(--glow-c-rgb), 0.16), transparent 72%),
+        radial-gradient(42% 44% at 68% 62%, rgba(var(--glow-a-rgb), 0.11), transparent 70%),
+        radial-gradient(38% 42% at 24% 66%, rgba(var(--glow-b-rgb), 0.09), transparent 70%);
+      animation: ambient-drift 70s ease-in-out infinite alternate;
+      will-change: transform;
+    }
+
+    /* Fine noise, so the large gradients do not band */
+    .ambient::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    :root[data-theme="light"] .ambient::before {
+      background:
+        radial-gradient(40% 48% at 14% 10%, rgba(var(--glow-a-rgb), 0.22), transparent 70%),
+        radial-gradient(46% 56% at 88% 20%, rgba(var(--glow-b-rgb), 0.18), transparent 70%),
+        radial-gradient(52% 58% at 50% 102%, rgba(var(--glow-c-rgb), 0.17), transparent 72%),
+        radial-gradient(42% 44% at 68% 62%, rgba(var(--glow-a-rgb), 0.12), transparent 70%),
+        radial-gradient(38% 42% at 24% 66%, rgba(var(--glow-b-rgb), 0.10), transparent 70%);
+    }
+
+    :root[data-theme="light"] .ambient::after {
+      opacity: 0.05;
+    }
+
+    @keyframes ambient-drift {
+      from { transform: translate3d(0, 0, 0) scale(1); }
+      to   { transform: translate3d(3%, -2%, 0) scale(1.06); }
+    }
+
+    /* ---------- Glass recipe ----------
+       backdrop-filter only on top level surfaces. Nesting blurs is slow and
+       renders badly in Safari, so inner surfaces use flat translucency. */
+    header,
+    .stat-card,
+    .card,
+    .tabs,
+    .quick-action-btn,
+    .status-indicator,
+    .theme-panel,
+    .modal-box {
+      /* Sheen and accent tint ride on top of a translucent pane, so the
+         wallpaper's color still blurs through from behind. */
+      background-color: var(--glass-bg);
+      background-image: var(--glass-sheen), var(--glass-tint);
+      -webkit-backdrop-filter: var(--glass-filter);
+      backdrop-filter: var(--glass-filter);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-highlight), var(--glass-shadow);
+    }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      header,
+      .stat-card,
+      .card,
+      .tabs,
+      .quick-action-btn,
+      .status-indicator,
+      .theme-panel,
+      .modal-box {
+        background: var(--bg-secondary);
+      }
+    }
+
+    /* Cursor spotlight. JS sets --spot-x/--spot-y on the hovered surface. */
+    .stat-card,
+    .card,
+    .quick-action-btn {
+      position: relative;
+    }
+
+    .stat-card::before,
+    .card::before,
+    .quick-action-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 400ms ease;
+      background: radial-gradient(
+        360px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+        var(--spotlight),
+        transparent 65%
+      );
+    }
+
+    .stat-card:hover::before,
+    .card:hover::before,
+    .quick-action-btn:hover::before {
+      opacity: 1;
     }
 
     .container {
@@ -37,13 +350,18 @@
       padding: 20px;
     }
 
+    /* ---------- Header ---------- */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 20px 0;
-      border-bottom: 1px solid var(--border-color);
-      margin-bottom: 30px;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 14px 20px;
+      border-radius: var(--r-lg);
+      margin: 8px 0 26px;
+      position: relative;
+      z-index: 10;
     }
 
     .logo {
@@ -55,11 +373,14 @@
     .logo svg {
       width: 40px;
       height: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     }
 
     .logo h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
+      font-size: 1.35rem;
+      font-weight: 620;
+      letter-spacing: -0.01em;
     }
 
     .logo span {
@@ -70,50 +391,74 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 16px;
-      background: var(--bg-secondary);
-      border-radius: 20px;
-      font-size: 0.9rem;
+      padding: 7px 14px;
+      border-radius: var(--r-full);
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      box-shadow: var(--glass-highlight);
     }
 
     .status-dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: var(--accent-red);
+      color: var(--accent-red);
+      box-shadow: 0 0 8px currentColor;
+      flex-shrink: 0;
     }
 
     .status-dot.connected {
       background: var(--accent-green);
+      color: var(--accent-green);
+      animation: pulse-dot 2.4s ease-in-out infinite;
     }
 
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 4px currentColor; opacity: 1; }
+      50%      { box-shadow: 0 0 11px currentColor; opacity: 0.75; }
+    }
+
+    /* ---------- Stat cards ---------- */
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
+      gap: 18px;
+      margin-bottom: 26px;
     }
 
     .stat-card {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 20px;
+      border-radius: var(--r-md);
+      padding: 18px 20px;
+      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
+                  var(--glass-shadow), var(--card-glow);
+      transition: transform var(--dur-med) var(--ease-out-expo),
+                  border-color var(--dur-fast) ease,
+                  box-shadow var(--dur-med) ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--glass-border-bright);
+      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
+                  var(--glass-shadow), var(--card-glow-hover);
     }
 
     .stat-card h3 {
       color: var(--text-secondary);
-      font-size: 0.85rem;
+      font-size: 0.72rem;
       font-weight: 500;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.08em;
     }
 
     .stat-card .value {
-      font-size: clamp(1rem, 3vw, 1.8rem);
-      font-weight: 600;
+      font-size: clamp(1rem, 3vw, 1.7rem);
+      font-weight: 640;
+      letter-spacing: -0.02em;
       color: var(--accent-orange);
+      text-shadow: 0 0 24px var(--accent-glow);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -124,33 +469,46 @@
       word-break: break-all;
     }
 
+    /* ---------- Tabs ---------- */
     .tabs {
       display: flex;
       gap: 4px;
       margin-bottom: 20px;
-      border-bottom: 1px solid var(--border-color);
+      padding: 6px;
+      border-radius: var(--r-full);
       overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar {
+      display: none;
     }
 
     .tab {
-      padding: 12px 24px;
+      padding: 9px 18px;
       background: transparent;
-      border: none;
+      border: 1px solid transparent;
+      border-radius: var(--r-full);
       color: var(--text-secondary);
       cursor: pointer;
-      font-size: 0.95rem;
-      border-bottom: 2px solid transparent;
-      transition: all 0.2s;
+      font-size: 0.9rem;
+      font-weight: 500;
       white-space: nowrap;
+      transition: color var(--dur-fast) ease,
+                  background var(--dur-fast) ease,
+                  box-shadow var(--dur-med) ease;
     }
 
     .tab:hover {
       color: var(--text-primary);
+      background: var(--glass-inner);
     }
 
     .tab.active {
       color: var(--accent-orange);
-      border-bottom-color: var(--accent-orange);
+      background: var(--accent-dim);
+      border-color: rgba(var(--accent-rgb), 0.35);
+      box-shadow: var(--glass-highlight), 0 2px 18px -4px var(--accent-glow);
     }
 
     .tab-content {
@@ -159,24 +517,49 @@
 
     .tab-content.active {
       display: block;
+      animation: fade-up var(--dur-med) var(--ease-out-expo);
     }
 
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ---------- Cards ---------- */
     .card {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 20px;
+      border-radius: var(--r-lg);
+      padding: 22px;
+      margin-bottom: 18px;
+      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
+                  var(--glass-shadow), var(--card-glow);
+      transition: border-color var(--dur-fast) ease, box-shadow var(--dur-med) ease;
+    }
+
+    .card:hover {
+      border-color: var(--glass-border-bright);
+      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
+                  var(--glass-shadow), var(--card-glow-hover);
     }
 
     .card h2 {
-      font-size: 1.2rem;
-      margin-bottom: 20px;
+      font-size: 1.05rem;
+      font-weight: 620;
+      letter-spacing: -0.01em;
+      margin-bottom: 18px;
       display: flex;
       align-items: center;
       gap: 10px;
     }
 
+    /* Card contents sit above the spotlight layer */
+    .card > *,
+    .stat-card > *,
+    .quick-action-btn > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---------- Forms ---------- */
     .form-group {
       margin-bottom: 16px;
     }
@@ -185,76 +568,56 @@
       display: block;
       margin-bottom: 6px;
       color: var(--text-secondary);
-      font-size: 0.9rem;
+      font-size: 0.85rem;
     }
 
-    .form-group input, .form-group select, .form-group textarea {
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
       width: 100%;
-      padding: 12px;
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
+      padding: 11px 13px;
+      background: var(--glass-inner);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--r-sm);
       color: var(--text-primary);
-      font-size: 1rem;
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: border-color var(--dur-fast) ease,
+                  background var(--dur-fast) ease,
+                  box-shadow var(--dur-fast) ease;
     }
 
-    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    .form-group input::placeholder,
+    .form-group textarea::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.6;
+    }
+
+    .form-group input:hover,
+    .form-group select:hover,
+    .form-group textarea:hover {
+      border-color: var(--glass-border-bright);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
       outline: none;
+      background: var(--glass-inner-2);
       border-color: var(--accent-orange);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+
+    .form-group select option {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
     }
 
     .form-group textarea {
       min-height: 100px;
-      font-family: monospace;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
       resize: vertical;
-    }
-
-    .btn {
-      padding: 12px 24px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 0.95rem;
-      font-weight: 500;
-      transition: all 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .btn-primary {
-      background: var(--accent-orange);
-      color: #000;
-    }
-
-    .btn-primary:hover {
-      opacity: 0.9;
-    }
-
-    .btn-secondary {
-      background: var(--bg-tertiary);
-      color: var(--text-primary);
-      border: 1px solid var(--border-color);
-    }
-
-    .btn-secondary:hover {
-      background: var(--border-color);
-    }
-
-    .btn-danger {
-      background: var(--accent-red);
-      color: white;
-    }
-
-    .btn-success {
-      background: var(--accent-green);
-      color: white;
-    }
-
-    .btn-group {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
     }
 
     .checkbox-group {
@@ -265,41 +628,17 @@
     }
 
     .checkbox-group input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
+      width: 17px;
+      height: 17px;
       accent-color: var(--accent-orange);
       cursor: pointer;
     }
 
     .checkbox-group label {
       color: var(--text-secondary);
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       cursor: pointer;
       margin: 0;
-    }
-
-    .result-box {
-      background: var(--bg-primary);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 16px;
-      margin-top: 16px;
-      font-family: monospace;
-      font-size: 0.9rem;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      word-break: break-all;
-      max-height: 400px;
-      overflow-y: auto;
-    }
-
-    .result-box.success {
-      border-color: var(--accent-green);
-    }
-
-    .result-box.error {
-      border-color: var(--accent-red);
-      color: var(--accent-red);
     }
 
     .inline-form {
@@ -315,6 +654,138 @@
       min-width: 150px;
     }
 
+    /* ---------- Buttons ---------- */
+    .btn {
+      padding: 11px 20px;
+      border: 1px solid transparent;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 560;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform var(--dur-fast) ease,
+                  filter var(--dur-fast) ease,
+                  background var(--dur-fast) ease,
+                  box-shadow var(--dur-med) ease;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-orange), var(--accent-2));
+      color: var(--accent-contrast);
+      border-color: rgba(var(--accent-rgb), 0.5);
+      box-shadow: var(--glass-highlight), 0 4px 18px -6px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.08);
+      box-shadow: var(--glass-highlight), 0 6px 26px -6px rgba(var(--accent-rgb), 0.7);
+    }
+
+    .btn-secondary {
+      background: var(--glass-inner);
+      color: var(--text-primary);
+      border-color: var(--glass-border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--glass-inner-2);
+      border-color: var(--glass-border-bright);
+    }
+
+    .btn-success {
+      background: rgba(var(--green-rgb), 0.16);
+      color: var(--accent-green);
+      border-color: rgba(var(--green-rgb), 0.4);
+    }
+
+    .btn-success:hover {
+      background: rgba(var(--green-rgb), 0.26);
+      box-shadow: 0 4px 20px -6px rgba(var(--green-rgb), 0.55);
+    }
+
+    .btn-danger {
+      background: rgba(var(--red-rgb), 0.16);
+      color: var(--accent-red);
+      border-color: rgba(var(--red-rgb), 0.4);
+    }
+
+    .btn-danger:hover {
+      background: rgba(var(--red-rgb), 0.26);
+      box-shadow: 0 4px 20px -6px rgba(var(--red-rgb), 0.55);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .copy-btn {
+      background: var(--glass-inner);
+      border: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      padding: 3px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-family: inherit;
+      transition: all var(--dur-fast) ease;
+    }
+
+    .copy-btn:hover {
+      color: var(--accent-orange);
+      border-color: rgba(var(--accent-rgb), 0.45);
+      background: var(--accent-dim);
+    }
+
+    /* ---------- Quick actions ---------- */
+    .quick-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .quick-action-btn {
+      padding: 16px 22px;
+      border-radius: var(--r-md);
+      color: var(--text-primary);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.9rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      min-width: 120px;
+      box-shadow: var(--glass-highlight), var(--glass-shadow);
+      transition: transform var(--dur-med) var(--ease-out-expo),
+                  border-color var(--dur-fast) ease,
+                  box-shadow var(--dur-med) ease;
+    }
+
+    .quick-action-btn:hover {
+      transform: translateY(-3px);
+      border-color: rgba(var(--accent-rgb), 0.45);
+      box-shadow: var(--glass-highlight), var(--glass-shadow), var(--card-glow-hover);
+    }
+
+    .quick-action-btn svg {
+      width: 26px;
+      height: 26px;
+      color: var(--accent-orange);
+      filter: drop-shadow(0 0 8px var(--accent-glow));
+    }
+
+    /* ---------- Tables ---------- */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -322,20 +793,24 @@
 
     th, td {
       text-align: left;
-      padding: 12px;
-      border-bottom: 1px solid var(--border-color);
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--hairline);
     }
 
     th {
       color: var(--text-secondary);
       font-weight: 500;
-      font-size: 0.85rem;
+      font-size: 0.72rem;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.08em;
     }
 
-    tr:hover {
-      background: var(--bg-tertiary);
+    tbody tr {
+      transition: background var(--dur-fast) ease;
+    }
+
+    tbody tr:hover {
+      background: var(--glass-inner);
     }
 
     .truncate {
@@ -345,87 +820,77 @@
       white-space: nowrap;
     }
 
+    /* ---------- Badges ---------- */
     .badge {
       display: inline-block;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 0.8rem;
+      padding: 3px 10px;
+      border-radius: var(--r-full);
+      font-size: 0.75rem;
       font-weight: 500;
+      border: 1px solid transparent;
     }
 
     .badge-success {
-      background: rgba(35, 134, 54, 0.2);
+      background: rgba(var(--green-rgb), 0.14);
+      border-color: rgba(var(--green-rgb), 0.3);
       color: var(--accent-green);
     }
 
     .badge-warning {
-      background: rgba(247, 147, 26, 0.2);
-      color: var(--accent-orange);
+      background: rgba(var(--yellow-rgb), 0.14);
+      border-color: rgba(var(--yellow-rgb), 0.3);
+      color: var(--accent-yellow);
     }
 
     .badge-danger {
-      background: rgba(218, 54, 51, 0.2);
+      background: rgba(var(--red-rgb), 0.14);
+      border-color: rgba(var(--red-rgb), 0.3);
       color: var(--accent-red);
+    }
+
+    /* ---------- Result boxes ---------- */
+    .result-box {
+      background: rgba(var(--bg-rgb), 0.45);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--r-sm);
+      padding: 14px;
+      margin-top: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.55;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 400px;
+      overflow-y: auto;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .result-box.success {
+      border-color: rgba(var(--green-rgb), 0.45);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2),
+                  0 0 20px -6px rgba(var(--green-rgb), 0.35);
+    }
+
+    .result-box.error {
+      border-color: rgba(var(--red-rgb), 0.45);
+      color: var(--accent-red);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2),
+                  0 0 20px -6px rgba(var(--red-rgb), 0.35);
     }
 
     .grid-2 {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-      gap: 20px;
+      gap: 18px;
     }
 
-    .copy-btn {
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border-color);
-      color: var(--text-secondary);
-      padding: 4px 8px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-
-    .copy-btn:hover {
-      color: var(--text-primary);
-    }
-
-    .quick-actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 20px;
-    }
-
-    .quick-action-btn {
-      padding: 16px 24px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      color: var(--text-primary);
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      min-width: 120px;
-    }
-
-    .quick-action-btn:hover {
-      border-color: var(--accent-orange);
-      transform: translateY(-2px);
-    }
-
-    .quick-action-btn svg {
-      width: 28px;
-      height: 28px;
-      color: var(--accent-orange);
-    }
-
+    /* ---------- Misc ---------- */
     .loading {
       display: inline-block;
       width: 20px;
       height: 20px;
-      border: 2px solid var(--border-color);
+      border: 2px solid var(--glass-border);
       border-top-color: var(--accent-orange);
       border-radius: 50%;
       animation: spin 1s linear infinite;
@@ -459,12 +924,13 @@
     }
 
     .network-warning {
-      background: rgba(234, 179, 8, 0.1);
-      border: 1px solid #eab308;
-      border-radius: 8px;
+      background: rgba(var(--yellow-rgb), 0.1);
+      border: 1px solid rgba(var(--yellow-rgb), 0.4);
+      border-radius: var(--r-md);
       padding: 12px 16px;
       margin-bottom: 20px;
-      color: #eab308;
+      color: var(--accent-yellow);
+      box-shadow: var(--glass-highlight), 0 8px 32px -12px rgba(var(--yellow-rgb), 0.4);
       display: none;
     }
 
@@ -480,66 +946,75 @@
       flex-shrink: 0;
     }
 
-    /* Theme Panel Styles */
+    /* ---------- Theme panel ---------- */
     .settings-btn {
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border-color);
+      background: var(--glass-inner);
+      border: 1px solid var(--glass-border);
       color: var(--text-secondary);
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
+      width: 38px;
+      height: 38px;
+      border-radius: var(--r-sm);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.2s;
+      transition: all var(--dur-fast) ease;
     }
 
     .settings-btn:hover {
-      color: var(--text-primary);
-      border-color: var(--accent-orange);
+      color: var(--accent-orange);
+      background: var(--accent-dim);
+      border-color: rgba(var(--accent-rgb), 0.45);
     }
 
     .settings-btn svg {
-      width: 20px;
-      height: 20px;
+      width: 19px;
+      height: 19px;
     }
 
     .theme-panel {
       position: fixed;
       top: 0;
-      right: -320px;
-      width: 320px;
+      right: 0;
+      width: 340px;
+      max-width: 100%;
       height: 100vh;
-      background: var(--bg-secondary);
-      border-left: 1px solid var(--border-color);
+      background: var(--glass-bg-heavy);
+      border: none;
+      border-left: 1px solid var(--glass-border);
+      border-radius: 0;
       padding: 24px;
       z-index: 1000;
-      transition: right 0.3s ease;
       overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform var(--dur-med) var(--ease-out-expo);
+      box-shadow: -24px 0 60px -24px rgba(0, 0, 0, 0.5);
     }
 
     .theme-panel.open {
-      right: 0;
+      transform: translateX(0);
     }
 
     .theme-panel-overlay {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.5);
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      -webkit-backdrop-filter: blur(var(--blur-soft));
+      backdrop-filter: blur(var(--blur-soft));
       z-index: 999;
-      display: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity var(--dur-med) ease, visibility var(--dur-med) ease;
     }
 
     .theme-panel-overlay.open {
-      display: block;
+      opacity: 1;
+      visibility: visible;
     }
 
     .theme-panel h3 {
-      font-size: 1.2rem;
+      font-size: 1.05rem;
+      font-weight: 620;
       margin-bottom: 24px;
       display: flex;
       justify-content: space-between;
@@ -559,15 +1034,77 @@
       color: var(--text-primary);
     }
 
+    /* ---------- Toggle switch ---------- */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 22px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .switch-row .switch-label {
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+
+    .switch-row .switch-hint {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      margin-top: 2px;
+    }
+
+    .switch {
+      flex-shrink: 0;
+      width: 44px;
+      height: 26px;
+      padding: 0;
+      border-radius: var(--r-full);
+      border: 1px solid var(--glass-border);
+      background: var(--glass-inner-2);
+      cursor: pointer;
+      position: relative;
+      transition: background var(--dur-fast) ease,
+                  border-color var(--dur-fast) ease,
+                  box-shadow var(--dur-med) ease;
+    }
+
+    .switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--text-secondary);
+      transition: transform var(--dur-med) var(--ease-out-expo),
+                  background var(--dur-fast) ease;
+    }
+
+    .switch[aria-checked="true"] {
+      background: var(--accent-orange);
+      border-color: rgba(var(--accent-rgb), 0.6);
+      box-shadow: 0 0 14px -2px var(--accent-glow);
+    }
+
+    .switch[aria-checked="true"]::after {
+      background: var(--accent-contrast);
+      transform: translateX(18px);
+    }
+
     .color-option {
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
 
     .color-option label {
       display: block;
       margin-bottom: 8px;
       color: var(--text-secondary);
-      font-size: 0.9rem;
+      font-size: 0.85rem;
     }
 
     .color-picker-wrapper {
@@ -577,12 +1114,13 @@
     }
 
     .color-picker-wrapper input[type="color"] {
-      width: 50px;
-      height: 40px;
+      width: 48px;
+      height: 38px;
       border: none;
-      border-radius: 8px;
+      border-radius: var(--r-sm);
       cursor: pointer;
       background: none;
+      padding: 0;
     }
 
     .color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
@@ -590,54 +1128,62 @@
     }
 
     .color-picker-wrapper input[type="color"]::-webkit-color-swatch {
-      border: 2px solid var(--border-color);
-      border-radius: 6px;
+      border: 1px solid var(--glass-border-bright);
+      border-radius: 8px;
     }
 
     .color-picker-wrapper input[type="text"] {
       flex: 1;
-      padding: 10px;
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
+      min-width: 0;
+      padding: 9px 11px;
+      background: var(--glass-inner);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--r-sm);
       color: var(--text-primary);
-      font-family: monospace;
-      font-size: 0.9rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    .color-picker-wrapper input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent-orange);
+      box-shadow: 0 0 0 3px var(--accent-dim);
     }
 
     .theme-presets {
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
 
     .theme-presets label {
       display: block;
       margin-bottom: 10px;
       color: var(--text-secondary);
-      font-size: 0.9rem;
+      font-size: 0.85rem;
     }
 
     .preset-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
+      gap: 10px;
     }
 
     .preset-btn {
       width: 100%;
       aspect-ratio: 1;
-      border: 2px solid var(--border-color);
-      border-radius: 8px;
+      border: 1px solid var(--glass-border-bright);
+      border-radius: var(--r-sm);
       cursor: pointer;
-      transition: all 0.2s;
+      transition: transform var(--dur-fast) var(--ease-out-expo),
+                  box-shadow var(--dur-med) ease;
     }
 
     .preset-btn:hover {
-      transform: scale(1.1);
+      transform: scale(1.12);
+      box-shadow: 0 4px 16px -4px currentColor;
     }
 
     .preset-btn.active {
-      border-color: var(--text-primary);
-      box-shadow: 0 0 0 2px var(--bg-primary);
+      box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--text-primary);
     }
 
     .theme-actions {
@@ -645,11 +1191,97 @@
       gap: 10px;
       margin-top: 24px;
       padding-top: 24px;
-      border-top: 1px solid var(--border-color);
+      border-top: 1px solid var(--hairline);
     }
 
     .theme-actions button {
       flex: 1;
+    }
+
+    /* ---------- Modal ---------- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      -webkit-backdrop-filter: blur(var(--blur-soft));
+      backdrop-filter: blur(var(--blur-soft));
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-box {
+      background: var(--glass-bg-heavy);
+      border: 1px solid rgba(var(--red-rgb), 0.4);
+      border-radius: var(--r-lg);
+      padding: 24px;
+      max-width: 450px;
+      width: 100%;
+      box-shadow: var(--glass-highlight), 0 24px 64px -16px rgba(var(--red-rgb), 0.35);
+      animation: modal-in var(--dur-med) var(--ease-out-expo);
+    }
+
+    @keyframes modal-in {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .modal-box h3 {
+      color: var(--accent-red);
+      font-size: 1.05rem;
+      font-weight: 620;
+      margin-bottom: 14px;
+    }
+
+    .modal-box p {
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+      font-size: 0.92rem;
+    }
+
+    .modal-box strong {
+      color: var(--text-primary);
+    }
+
+    .modal-box input[type="text"] {
+      width: 100%;
+      padding: 11px 13px;
+      background: var(--glass-inner);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--r-sm);
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      font-family: inherit;
+      margin-bottom: 20px;
+    }
+
+    .modal-box input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent-red);
+      box-shadow: 0 0 0 3px rgba(var(--red-rgb), 0.15);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .modal-actions .btn {
+      flex: 1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ambient::before,
+      .status-dot.connected {
+        animation: none;
+      }
+
+      *, *::before, *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+      }
     }
 
     @media (max-width: 768px) {
@@ -664,12 +1296,24 @@
       }
       .theme-panel {
         width: 100%;
-        right: -100%;
+      }
+      header {
+        justify-content: center;
       }
     }
   </style>
+  <script>
+    // Apply the saved glass choice before the first paint, so turning the effect
+    // off does not flash a frosted frame on every load.
+    try {
+      if (localStorage.getItem('dashboardGlass') === 'off') {
+        document.documentElement.setAttribute('data-glass', 'off');
+      }
+    } catch (e) { /* storage unavailable, keep the default */ }
+  </script>
 </head>
 <body>
+  <div class="ambient"></div>
   <div class="container">
     <header>
       <div class="logo">
@@ -710,6 +1354,15 @@
         Theme Settings
         <button class="close-btn" onclick="toggleThemePanel()">&times;</button>
       </h3>
+
+      <div class="switch-row">
+        <div>
+          <span class="switch-label">Glass Effect</span>
+          <span class="switch-hint">Frosted cards, glow and wallpaper</span>
+        </div>
+        <button type="button" class="switch" id="glassToggle" role="switch"
+                aria-checked="true" aria-label="Glass Effect" onclick="toggleGlass()"></button>
+      </div>
 
       <div class="theme-presets">
         <label>Dark Themes</label>
@@ -1261,20 +1914,20 @@
   </div>
 
   <!-- Reset Confirmation Modal -->
-  <div id="resetModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;">
-    <div style="background: var(--bg-secondary); border: 1px solid var(--accent-red); border-radius: 12px; padding: 24px; max-width: 450px; margin: 20px;">
-      <h3 style="color: var(--accent-red); margin-bottom: 16px;">Confirm Chain Reset</h3>
-      <p style="color: var(--text-secondary); margin-bottom: 16px;">
+  <div id="resetModal" class="modal-overlay">
+    <div class="modal-box">
+      <h3>Confirm Chain Reset</h3>
+      <p>
         This will invalidate ALL blocks and reset the chain to block 0.
-        <strong style="color: var(--text-primary);">Your entire wallet balance will be lost.</strong>
+        <strong>Your entire wallet balance will be lost.</strong>
       </p>
-      <p style="color: var(--text-secondary); margin-bottom: 20px;">
+      <p>
         Type <strong style="color: var(--accent-red);">RESET</strong> below to confirm:
       </p>
-      <input type="text" id="resetConfirmInput" placeholder="Type RESET to confirm" style="width: 100%; padding: 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); margin-bottom: 20px; font-size: 1rem;">
-      <div style="display: flex; gap: 12px;">
-        <button class="btn btn-secondary" onclick="hideResetModal()" style="flex: 1;">Cancel</button>
-        <button class="btn btn-danger" onclick="executeReset()" style="flex: 1;">Reset Chain</button>
+      <input type="text" id="resetConfirmInput" placeholder="Type RESET to confirm">
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="hideResetModal()">Cancel</button>
+        <button class="btn btn-danger" onclick="executeReset()">Reset Chain</button>
       </div>
     </div>
   </div>
@@ -1406,15 +2059,15 @@
                 <div class="value" style="font-size: 1rem;">${info.network}</div>
               </div>
             </div>
-            <div style="margin-top: 16px; padding: 16px; background: var(--bg-primary); border-radius: 8px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+            <div style="margin-top: 16px; padding: 16px; background: var(--glass-inner); border-radius: 8px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
               <div id="electrsQrCode" style="background: white; padding: 8px; border-radius: 8px; display: inline-block;"></div>
               <div style="flex: 1; min-width: 200px;">
                 <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">Connection String (Umbrel format):</div>
-                <code style="font-size: 1rem; word-break: break-all; display: block; padding: 8px; background: var(--bg-tertiary); border-radius: 4px;">
+                <code style="font-size: 1rem; word-break: break-all; display: block; padding: 8px; background: var(--glass-inner-2); border-radius: 4px;">
                   ${connectionString}
                 </code>
                 <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 12px; margin-bottom: 8px;">Connect with Electrum CLI:</div>
-                <code style="font-size: 0.85rem; word-break: break-all; display: block; padding: 8px; background: var(--bg-tertiary); border-radius: 4px;">
+                <code style="font-size: 0.85rem; word-break: break-all; display: block; padding: 8px; background: var(--glass-inner-2); border-radius: 4px;">
                   electrum --regtest --oneserver --server ${connectionString}
                 </code>
               </div>
@@ -2271,7 +2924,7 @@
         // Render inputs
         if (vinArray.length === 0 || (vinArray.length === 1 && vinArray[0].coinbase)) {
           document.getElementById('txInputs').innerHTML = `
-            <div style="padding: 16px; background: var(--bg-primary); border-radius: 8px; text-align: center;">
+            <div style="padding: 16px; background: var(--glass-inner); border-radius: 8px; text-align: center;">
               <span class="badge badge-success" style="font-size: 0.9rem;">Coinbase (Mining Reward)</span>
             </div>
           `;
@@ -2279,7 +2932,7 @@
           document.getElementById('txInputs').innerHTML = `
             <div style="max-height: 400px; overflow-y: auto;">
               ${vinArray.map((input, idx) => `
-                <div style="padding: 12px; background: var(--bg-primary); border-radius: 8px; margin-bottom: 8px;">
+                <div style="padding: 12px; background: var(--glass-inner); border-radius: 8px; margin-bottom: 8px;">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <span style="color: var(--text-secondary); font-size: 0.85rem;">#${idx}</span>
                     ${input.prevout && input.prevout.value ? `
@@ -2307,7 +2960,7 @@
         document.getElementById('txOutputs').innerHTML = `
           <div style="max-height: 400px; overflow-y: auto;">
             ${voutArray.map((output, idx) => `
-              <div style="padding: 12px; background: var(--bg-primary); border-radius: 8px; margin-bottom: 8px;">
+              <div style="padding: 12px; background: var(--glass-inner); border-radius: 8px; margin-bottom: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                   <span style="color: var(--text-secondary); font-size: 0.85rem;">#${idx}</span>
                   <span style="color: var(--accent-green); font-weight: 600;">${output.value.toFixed(8)} BTC</span>
@@ -2481,13 +3134,13 @@
             ` : ''}
           </div>
           ${addressInfo && addressInfo.hdkeypath ? `
-            <div style="margin-top: 16px; padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+            <div style="margin-top: 16px; padding: 12px; background: var(--glass-inner); border-radius: 8px;">
               <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 4px;">HD Key Path</div>
               <div style="font-family: monospace; font-size: 0.9rem;">${addressInfo.hdkeypath}</div>
             </div>
           ` : ''}
           ${validation.scriptPubKey ? `
-            <div style="margin-top: 16px; padding: 12px; background: var(--bg-primary); border-radius: 8px;">
+            <div style="margin-top: 16px; padding: 12px; background: var(--glass-inner); border-radius: 8px;">
               <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 4px;">Script PubKey</div>
               <div style="font-family: monospace; font-size: 0.8rem; word-break: break-all;">${validation.scriptPubKey}</div>
             </div>
@@ -2675,30 +3328,54 @@
       document.getElementById('themePanelOverlay').classList.toggle('open');
     }
 
+    // Glass effect. The head script applies the saved choice before first paint,
+    // so this only has to keep the attribute, the switch and storage in sync.
+    function setGlass(enabled) {
+      document.documentElement.setAttribute('data-glass', enabled ? 'on' : 'off');
+      document.getElementById('glassToggle').setAttribute('aria-checked', String(enabled));
+      localStorage.setItem('dashboardGlass', enabled ? 'on' : 'off');
+    }
+
+    function toggleGlass() {
+      setGlass(document.documentElement.getAttribute('data-glass') === 'off');
+    }
+
     function updateColor(type, value) {
       const root = document.documentElement;
 
       switch(type) {
         case 'accent':
           root.style.setProperty('--accent-orange', value);
+          root.style.setProperty('--accent-2', adjustColor(value, 28));
+          root.style.setProperty('--accent-rgb', hexToRgb(value));
+          // Text that stays legible on a filled accent button
+          root.style.setProperty('--accent-contrast', getLuminance(value) > 0.42 ? '#0b1220' : '#ffffff');
+          // Two hue companions turn a single accent into a multicolor wallpaper mesh
+          root.style.setProperty('--glow-a-rgb', hexToRgb(value));
+          root.style.setProperty('--glow-b-rgb', hexToRgb(rotateHue(value, 130)));
+          root.style.setProperty('--glow-c-rgb', hexToRgb(rotateHue(value, -110)));
           document.getElementById('accentColorText').value = value;
           document.getElementById('accentColor').value = value;
           break;
         case 'bg':
           root.style.setProperty('--bg-primary', value);
+          root.style.setProperty('--bg-rgb', hexToRgb(value));
           document.getElementById('bgColorText').value = value;
           document.getElementById('bgColor').value = value;
-          // Also update tertiary bg
+          // Pale backgrounds need dark hairlines and darker semantic colors
+          root.setAttribute('data-theme', getLuminance(value) > 0.5 ? 'light' : 'dark');
           root.style.setProperty('--bg-tertiary', adjustColor(value, 20));
           root.style.setProperty('--border-color', adjustColor(value, 35));
           break;
         case 'card':
           root.style.setProperty('--bg-secondary', value);
+          root.style.setProperty('--card-rgb', hexToRgb(value));
           document.getElementById('cardColorText').value = value;
           document.getElementById('cardColor').value = value;
           break;
         case 'text':
           root.style.setProperty('--text-primary', value);
+          root.style.setProperty('--text-rgb', hexToRgb(value));
           root.style.setProperty('--text-secondary', adjustColor(value, -40));
           document.getElementById('textColorText').value = value;
           document.getElementById('textColor').value = value;
@@ -2706,7 +3383,7 @@
       }
 
       saveTheme();
-      updateThemeButtonVisibility();
+      syncActivePreset();
     }
 
     function updateColorFromText(type, value) {
@@ -2723,7 +3400,52 @@
       return '#' + (0x1000000 + (r << 16) + (g << 8) + b).toString(16).slice(1);
     }
 
-    // Calculate relative luminance of a color (WCAG formula)
+    // "#3b82f6" -> "59, 130, 246", so CSS can restate the color at any alpha
+    function hexToRgb(hex) {
+      const num = parseInt(hex.slice(1), 16);
+      return `${num >> 16}, ${(num >> 8) & 0x00FF}, ${num & 0x0000FF}`;
+    }
+
+    // Spin the accent's hue to get a companion color for the ambient wallpaper.
+    // Saturation is floored so that grey or near-white accents still tint the mesh.
+    function rotateHue(hex, degrees) {
+      const num = parseInt(hex.slice(1), 16);
+      const r = (num >> 16) / 255;
+      const g = ((num >> 8) & 0x00FF) / 255;
+      const b = (num & 0x0000FF) / 255;
+
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const delta = max - min;
+      const l = (max + min) / 2;
+      const s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+
+      let h = 0;
+      if (delta !== 0) {
+        if (max === r) h = 60 * (((g - b) / delta) % 6);
+        else if (max === g) h = 60 * ((b - r) / delta + 2);
+        else h = 60 * ((r - g) / delta + 4);
+      }
+      h = (h + degrees + 360) % 360;
+
+      const c = (1 - Math.abs(2 * l - 1)) * Math.max(s, 0.5);
+      const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+      const m = l - c / 2;
+
+      let parts;
+      if (h < 60) parts = [c, x, 0];
+      else if (h < 120) parts = [x, c, 0];
+      else if (h < 180) parts = [0, c, x];
+      else if (h < 240) parts = [0, x, c];
+      else if (h < 300) parts = [x, 0, c];
+      else parts = [c, 0, x];
+
+      return '#' + parts
+        .map((v) => Math.min(255, Math.max(0, Math.round((v + m) * 255))).toString(16).padStart(2, '0'))
+        .join('');
+    }
+
+    // Relative luminance (WCAG formula), used to pick light vs dark treatments
     function getLuminance(hex) {
       const num = parseInt(hex.slice(1), 16);
       const r = (num >> 16) / 255;
@@ -2735,60 +3457,33 @@
       return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
     }
 
-    // Calculate contrast ratio between two colors
-    function getContrastRatio(hex1, hex2) {
-      const l1 = getLuminance(hex1);
-      const l2 = getLuminance(hex2);
-      const lighter = Math.max(l1, l2);
-      const darker = Math.min(l1, l2);
-      return (lighter + 0.05) / (darker + 0.05);
+    // Ring whichever preset swatch matches the colors currently applied
+    function syncActivePreset() {
+      const current = {
+        accent: document.getElementById('accentColor').value,
+        bg: document.getElementById('bgColor').value,
+        card: document.getElementById('cardColor').value,
+        text: document.getElementById('textColor').value
+      };
+
+      document.querySelectorAll('.preset-btn').forEach((btn) => {
+        const match = (btn.getAttribute('onclick') || '').match(/applyPreset\('(\w+)'\)/);
+        const preset = match && presets[match[1]];
+        const isActive = !!preset && ['accent', 'bg', 'card', 'text']
+          .every((key) => preset[key].toLowerCase() === current[key].toLowerCase());
+        btn.classList.toggle('active', isActive);
+      });
     }
 
-    // Update theme panel buttons to ensure visibility
-    function updateThemeButtonVisibility() {
-      const resetBtn = document.getElementById('themeResetBtn');
-      const doneBtn = document.getElementById('themeDoneBtn');
-      if (!resetBtn || !doneBtn) return;
-
-      // Get current colors
-      const styles = getComputedStyle(document.documentElement);
-      const bgColor = styles.getPropertyValue('--bg-tertiary').trim() || '#21262d';
-      const textColor = styles.getPropertyValue('--text-primary').trim() || '#f0f6fc';
-      const accentColor = styles.getPropertyValue('--accent-orange').trim() || '#3b82f6';
-      const panelBg = styles.getPropertyValue('--bg-secondary').trim() || '#161b22';
-
-      // Check contrast for Reset button (btn-secondary uses bg-tertiary)
-      const resetBgContrast = getContrastRatio(bgColor, panelBg);
-      const resetTextContrast = getContrastRatio(textColor, bgColor);
-
-      // Check contrast for Done button (btn-primary uses accent color)
-      const doneBgContrast = getContrastRatio(accentColor, panelBg);
-
-      // Minimum contrast ratio for visibility (WCAG AA is 4.5, we use 2.5 for buttons)
-      const minContrast = 2.5;
-
-      // Reset button - add high-contrast border if background blends
-      if (resetBgContrast < minContrast || resetTextContrast < minContrast) {
-        // Use inverted colors for high contrast
-        const isLightBg = getLuminance(panelBg) > 0.5;
-        resetBtn.style.background = isLightBg ? '#1f2937' : '#e5e7eb';
-        resetBtn.style.color = isLightBg ? '#ffffff' : '#1f2937';
-        resetBtn.style.border = isLightBg ? '2px solid #374151' : '2px solid #9ca3af';
-      } else {
-        resetBtn.style.background = '';
-        resetBtn.style.color = '';
-        resetBtn.style.border = '';
-      }
-
-      // Done button - ensure accent color is visible
-      if (doneBgContrast < minContrast) {
-        const isLightBg = getLuminance(panelBg) > 0.5;
-        doneBtn.style.background = isLightBg ? '#1d4ed8' : '#60a5fa';
-        doneBtn.style.border = isLightBg ? '2px solid #1e40af' : '2px solid #93c5fd';
-      } else {
-        doneBtn.style.background = '';
-        doneBtn.style.border = '';
-      }
+    // Feed the cursor position to the spotlight gradient on glass surfaces
+    function trackSpotlight() {
+      document.addEventListener('pointermove', (e) => {
+        const surface = e.target.closest('.card, .stat-card, .quick-action-btn');
+        if (!surface) return;
+        const rect = surface.getBoundingClientRect();
+        surface.style.setProperty('--spot-x', `${e.clientX - rect.left}px`);
+        surface.style.setProperty('--spot-y', `${e.clientY - rect.top}px`);
+      }, { passive: true });
     }
 
     function applyPreset(name) {
@@ -2828,6 +3523,7 @@
 
     function resetTheme() {
       localStorage.removeItem('dashboardTheme');
+      setGlass(true);
       updateColor('accent', defaultTheme.accent);
       updateColor('bg', defaultTheme.bg);
       updateColor('card', defaultTheme.card);
@@ -2899,7 +3595,11 @@
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
       loadTheme();
-      updateThemeButtonVisibility();
+      syncActivePreset();
+      // Reflect the choice the head script already applied
+      document.getElementById('glassToggle')
+        .setAttribute('aria-checked', String(document.documentElement.getAttribute('data-glass') !== 'off'));
+      trackSpotlight();
       refreshAll();
       // Reflect an auto-mine job that may already be running on the server
       refreshAutoMineStatus();
