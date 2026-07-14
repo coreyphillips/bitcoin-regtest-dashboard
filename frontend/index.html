@@ -48,8 +48,24 @@
       --yellow-rgb: 240, 194, 63;
 
       /* Glass */
-      --glass-bg: rgba(var(--card-rgb), 0.55);
+      --glass-bg: rgba(var(--card-rgb), 0.52);
       --glass-bg-heavy: rgba(var(--card-rgb), 0.85);
+      /* Sheen laid over the glass, plus a faint wash of accent so the tint
+         carries across the pane rather than only where the mesh sits behind it */
+      --glass-sheen: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.05),
+        rgba(255, 255, 255, 0.015) 38%,
+        rgba(255, 255, 255, 0) 60%
+      );
+      --glass-tint: linear-gradient(
+        160deg,
+        rgba(var(--accent-rgb), 0.045),
+        rgba(var(--accent-rgb), 0.01) 55%,
+        transparent
+      );
+      /* Accent light bleeding in through the pane's edges */
+      --glass-inner-glow: inset 0 0 60px -42px rgba(var(--accent-rgb), 0.55);
       --glass-inner: rgba(255, 255, 255, 0.04);
       --glass-inner-2: rgba(255, 255, 255, 0.07);
       --glass-border: rgba(255, 255, 255, 0.09);
@@ -57,15 +73,18 @@
       --hairline: rgba(255, 255, 255, 0.06);
       --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
       --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
-      --blur: 22px;
+      --blur: 26px;
       --blur-soft: 10px;
+      /* A light touch of saturation and brightness is what sells the frost: it
+         pulls the wallpaper's color forward instead of letting the pane mute it */
+      --glass-filter: blur(var(--blur)) saturate(150%) brightness(1.04);
 
       /* Accent glow, the colored bloom under the glass */
       --accent-glow: rgba(var(--accent-rgb), 0.35);
       --accent-dim: rgba(var(--accent-rgb), 0.12);
-      --card-glow: 0 18px 44px -20px rgba(var(--accent-rgb), 0.5);
-      --card-glow-hover: 0 22px 56px -18px rgba(var(--accent-rgb), 0.75);
-      --spotlight: rgba(var(--accent-rgb), 0.06);
+      --card-glow: 0 18px 44px -22px rgba(var(--accent-rgb), 0.3);
+      --card-glow-hover: 0 22px 56px -20px rgba(var(--accent-rgb), 0.5);
+      --spotlight: rgba(var(--accent-rgb), 0.05);
 
       /* Shape + motion */
       --r-sm: 10px;
@@ -92,8 +111,23 @@
       --red-rgb: 217, 58, 64;
       --yellow-rgb: 184, 137, 11;
 
-      --glass-bg: rgba(var(--card-rgb), 0.6);
-      --glass-bg-heavy: rgba(var(--card-rgb), 0.9);
+      --glass-bg: rgba(var(--card-rgb), 0.58);
+      --glass-bg-heavy: rgba(var(--card-rgb), 0.88);
+      --glass-sheen: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.35),
+        rgba(255, 255, 255, 0.1) 40%,
+        rgba(255, 255, 255, 0) 65%
+      );
+      --glass-tint: linear-gradient(
+        160deg,
+        rgba(var(--accent-rgb), 0.04),
+        rgba(var(--accent-rgb), 0.01) 55%,
+        transparent
+      );
+      --glass-inner-glow: inset 0 0 60px -44px rgba(var(--accent-rgb), 0.45);
+      /* Pale glass needs almost no brightening or it blows out to flat white */
+      --glass-filter: blur(var(--blur)) saturate(140%) brightness(1.01);
       --glass-inner: rgba(20, 30, 60, 0.045);
       --glass-inner-2: rgba(20, 30, 60, 0.08);
       --glass-border: rgba(20, 30, 60, 0.1);
@@ -107,6 +141,43 @@
       --spotlight: rgba(var(--accent-rgb), 0.07);
 
       color-scheme: light;
+    }
+
+    /* ---------- Glass off ----------
+       Neutralizing the tokens turns every glass surface opaque and drops the
+       blurs, glows and wallpaper. Cheaper to render, and the theme colors keep
+       working exactly as before. */
+    :root[data-glass="off"] {
+      --glass-bg: rgb(var(--card-rgb));
+      --glass-bg-heavy: rgb(var(--card-rgb));
+      --glass-sheen: none;
+      --glass-tint: none;
+      --glass-filter: none;
+      --glass-inner-glow: 0 0 0 0 transparent;
+      --card-glow: 0 0 0 0 transparent;
+      --card-glow-hover: 0 0 0 0 transparent;
+      --spotlight: transparent;
+      --glass-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+      --glass-highlight: 0 0 0 0 transparent;
+    }
+
+    :root[data-glass="off"] .ambient::before,
+    :root[data-glass="off"] .ambient::after {
+      display: none;
+    }
+
+    :root[data-glass="off"] .stat-card .value {
+      text-shadow: none;
+    }
+
+    :root[data-glass="off"] .quick-action-btn svg {
+      filter: none;
+    }
+
+    :root[data-glass="off"] .theme-panel-overlay,
+    :root[data-glass="off"] .modal-overlay {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
     }
 
     * {
@@ -173,10 +244,11 @@
       position: absolute;
       inset: -20%;
       background:
-        radial-gradient(38% 45% at 16% 12%, rgba(var(--glow-a-rgb), 0.20), transparent 70%),
-        radial-gradient(45% 55% at 88% 22%, rgba(var(--glow-b-rgb), 0.16), transparent 70%),
-        radial-gradient(50% 55% at 50% 100%, rgba(var(--glow-c-rgb), 0.16), transparent 72%),
-        radial-gradient(30% 35% at 72% 72%, rgba(var(--glow-a-rgb), 0.10), transparent 70%);
+        radial-gradient(40% 48% at 14% 10%, rgba(var(--glow-a-rgb), 0.20), transparent 70%),
+        radial-gradient(46% 56% at 88% 20%, rgba(var(--glow-b-rgb), 0.17), transparent 70%),
+        radial-gradient(52% 58% at 50% 102%, rgba(var(--glow-c-rgb), 0.16), transparent 72%),
+        radial-gradient(42% 44% at 68% 62%, rgba(var(--glow-a-rgb), 0.11), transparent 70%),
+        radial-gradient(38% 42% at 24% 66%, rgba(var(--glow-b-rgb), 0.09), transparent 70%);
       animation: ambient-drift 70s ease-in-out infinite alternate;
       will-change: transform;
     }
@@ -192,10 +264,11 @@
 
     :root[data-theme="light"] .ambient::before {
       background:
-        radial-gradient(38% 45% at 16% 12%, rgba(var(--glow-a-rgb), 0.28), transparent 70%),
-        radial-gradient(45% 55% at 88% 22%, rgba(var(--glow-b-rgb), 0.22), transparent 70%),
-        radial-gradient(50% 55% at 50% 100%, rgba(var(--glow-c-rgb), 0.22), transparent 72%),
-        radial-gradient(30% 35% at 72% 72%, rgba(var(--glow-a-rgb), 0.14), transparent 70%);
+        radial-gradient(40% 48% at 14% 10%, rgba(var(--glow-a-rgb), 0.22), transparent 70%),
+        radial-gradient(46% 56% at 88% 20%, rgba(var(--glow-b-rgb), 0.18), transparent 70%),
+        radial-gradient(52% 58% at 50% 102%, rgba(var(--glow-c-rgb), 0.17), transparent 72%),
+        radial-gradient(42% 44% at 68% 62%, rgba(var(--glow-a-rgb), 0.12), transparent 70%),
+        radial-gradient(38% 42% at 24% 66%, rgba(var(--glow-b-rgb), 0.10), transparent 70%);
     }
 
     :root[data-theme="light"] .ambient::after {
@@ -218,9 +291,12 @@
     .status-indicator,
     .theme-panel,
     .modal-box {
-      background: var(--glass-bg);
-      -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
-      backdrop-filter: blur(var(--blur)) saturate(140%);
+      /* Sheen and accent tint ride on top of a translucent pane, so the
+         wallpaper's color still blurs through from behind. */
+      background-color: var(--glass-bg);
+      background-image: var(--glass-sheen), var(--glass-tint);
+      -webkit-backdrop-filter: var(--glass-filter);
+      backdrop-filter: var(--glass-filter);
       border: 1px solid var(--glass-border);
       box-shadow: var(--glass-highlight), var(--glass-shadow);
     }
@@ -354,7 +430,8 @@
     .stat-card {
       border-radius: var(--r-md);
       padding: 18px 20px;
-      box-shadow: var(--glass-highlight), var(--glass-shadow), var(--card-glow);
+      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
+                  var(--glass-shadow), var(--card-glow);
       transition: transform var(--dur-med) var(--ease-out-expo),
                   border-color var(--dur-fast) ease,
                   box-shadow var(--dur-med) ease;
@@ -363,7 +440,8 @@
     .stat-card:hover {
       transform: translateY(-2px);
       border-color: var(--glass-border-bright);
-      box-shadow: var(--glass-highlight), var(--glass-shadow), var(--card-glow-hover);
+      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
+                  var(--glass-shadow), var(--card-glow-hover);
     }
 
     .stat-card h3 {
@@ -452,13 +530,15 @@
       border-radius: var(--r-lg);
       padding: 22px;
       margin-bottom: 18px;
-      box-shadow: var(--glass-highlight), var(--glass-shadow), var(--card-glow);
+      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
+                  var(--glass-shadow), var(--card-glow);
       transition: border-color var(--dur-fast) ease, box-shadow var(--dur-med) ease;
     }
 
     .card:hover {
       border-color: var(--glass-border-bright);
-      box-shadow: var(--glass-highlight), var(--glass-shadow), var(--card-glow-hover);
+      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
+                  var(--glass-shadow), var(--card-glow-hover);
     }
 
     .card h2 {
@@ -885,7 +965,6 @@
       color: var(--accent-orange);
       background: var(--accent-dim);
       border-color: rgba(var(--accent-rgb), 0.45);
-      transform: rotate(35deg);
     }
 
     .settings-btn svg {
@@ -953,6 +1032,68 @@
 
     .theme-panel .close-btn:hover {
       color: var(--text-primary);
+    }
+
+    /* ---------- Toggle switch ---------- */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 22px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .switch-row .switch-label {
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+
+    .switch-row .switch-hint {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      margin-top: 2px;
+    }
+
+    .switch {
+      flex-shrink: 0;
+      width: 44px;
+      height: 26px;
+      padding: 0;
+      border-radius: var(--r-full);
+      border: 1px solid var(--glass-border);
+      background: var(--glass-inner-2);
+      cursor: pointer;
+      position: relative;
+      transition: background var(--dur-fast) ease,
+                  border-color var(--dur-fast) ease,
+                  box-shadow var(--dur-med) ease;
+    }
+
+    .switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--text-secondary);
+      transition: transform var(--dur-med) var(--ease-out-expo),
+                  background var(--dur-fast) ease;
+    }
+
+    .switch[aria-checked="true"] {
+      background: var(--accent-orange);
+      border-color: rgba(var(--accent-rgb), 0.6);
+      box-shadow: 0 0 14px -2px var(--accent-glow);
+    }
+
+    .switch[aria-checked="true"]::after {
+      background: var(--accent-contrast);
+      transform: translateX(18px);
     }
 
     .color-option {
@@ -1161,6 +1302,15 @@
       }
     }
   </style>
+  <script>
+    // Apply the saved glass choice before the first paint, so turning the effect
+    // off does not flash a frosted frame on every load.
+    try {
+      if (localStorage.getItem('dashboardGlass') === 'off') {
+        document.documentElement.setAttribute('data-glass', 'off');
+      }
+    } catch (e) { /* storage unavailable, keep the default */ }
+  </script>
 </head>
 <body>
   <div class="ambient"></div>
@@ -1204,6 +1354,15 @@
         Theme Settings
         <button class="close-btn" onclick="toggleThemePanel()">&times;</button>
       </h3>
+
+      <div class="switch-row">
+        <div>
+          <span class="switch-label">Glass Effect</span>
+          <span class="switch-hint">Frosted cards, glow and wallpaper</span>
+        </div>
+        <button type="button" class="switch" id="glassToggle" role="switch"
+                aria-checked="true" aria-label="Glass Effect" onclick="toggleGlass()"></button>
+      </div>
 
       <div class="theme-presets">
         <label>Dark Themes</label>
@@ -3169,6 +3328,18 @@
       document.getElementById('themePanelOverlay').classList.toggle('open');
     }
 
+    // Glass effect. The head script applies the saved choice before first paint,
+    // so this only has to keep the attribute, the switch and storage in sync.
+    function setGlass(enabled) {
+      document.documentElement.setAttribute('data-glass', enabled ? 'on' : 'off');
+      document.getElementById('glassToggle').setAttribute('aria-checked', String(enabled));
+      localStorage.setItem('dashboardGlass', enabled ? 'on' : 'off');
+    }
+
+    function toggleGlass() {
+      setGlass(document.documentElement.getAttribute('data-glass') === 'off');
+    }
+
     function updateColor(type, value) {
       const root = document.documentElement;
 
@@ -3352,6 +3523,7 @@
 
     function resetTheme() {
       localStorage.removeItem('dashboardTheme');
+      setGlass(true);
       updateColor('accent', defaultTheme.accent);
       updateColor('bg', defaultTheme.bg);
       updateColor('card', defaultTheme.card);
@@ -3424,6 +3596,9 @@
     document.addEventListener('DOMContentLoaded', () => {
       loadTheme();
       syncActivePreset();
+      // Reflect the choice the head script already applied
+      document.getElementById('glassToggle')
+        .setAttribute('aria-checked', String(document.documentElement.getAttribute('data-glass') !== 'off'));
       trackSpotlight();
       refreshAll();
       // Reflect an auto-mine job that may already be running on the server
