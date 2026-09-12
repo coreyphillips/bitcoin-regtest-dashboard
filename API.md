@@ -186,6 +186,16 @@ clients can discover that one is needed. `GET /api/health` reports `auth.require
 CORS is wide open by default, so without a token any web page the user visits can drive the node
 through `POST /api/rpc`. `CORS_ORIGIN` narrows that if you need it.
 
+### On umbrelOS
+
+umbrelOS puts apps behind a gateway that requires an umbrelOS login. This app whitelists `/api`
+so the API is reachable without those credentials, because handing your umbrelOS password to a
+test suite or an agent just to mine a block defeats the purpose. The dashboard UI itself stays
+behind umbrelOS authentication as normal.
+
+So on Umbrel the API is open on your LAN by default. That is deliberate for a regtest node whose
+coins are worthless, but `API_TOKEN` is there if you want it locked down.
+
 ## Deprecated endpoints
 
 `importaddress`, `importprivkey` and `dumpprivkey` require a legacy BDB wallet, which Bitcoin
