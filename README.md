@@ -234,6 +234,10 @@ API_TOKEN=your-token-here docker-compose up -d
 is required. Set a token if you ever point this dashboard at anything other than a throwaway
 regtest node: CORS is wide open, so without one any web page you visit can drive the node.
 
+On umbrelOS the dashboard UI sits behind an umbrelOS login, but the API is whitelisted so scripts
+and agents can reach it without your umbrelOS password. `API_TOKEN` is the way to lock it down
+there if you want to.
+
 ## Logs
 
 The **Logs** tab tails Bitcoin Core's `debug.log` and the dashboard's own output live, with
