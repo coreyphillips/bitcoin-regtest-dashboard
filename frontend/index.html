@@ -1301,6 +1301,67 @@
         justify-content: center;
       }
     }
+
+    /* Log viewer. .result-box breaks on any character, which shreds log lines,
+       so the pane opts back into normal wrapping and scrolls horizontally. */
+    .log-pane {
+      display: block;
+      min-height: 320px;
+      max-height: 560px;
+      white-space: pre;
+      word-break: normal;
+      overflow-x: auto;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      margin-top: 0;
+    }
+    .log-line { white-space: pre; }
+    .log-line.log-error { color: var(--accent-red); }
+    .log-line.log-warn { color: var(--accent-yellow); }
+    .log-line.log-meta { color: var(--text-secondary); font-style: italic; }
+    .log-toolbar { align-items: flex-end; }
+
+    /* API reference */
+    .api-group { margin-bottom: 10px; }
+    .api-group > summary {
+      cursor: pointer;
+      padding: 10px 12px;
+      border-radius: var(--r-sm);
+      font-weight: 600;
+      background: rgba(var(--bg-rgb), 0.35);
+      border: 1px solid var(--glass-border);
+    }
+    .api-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--glass-border);
+      flex-wrap: wrap;
+    }
+    .api-row:last-child { border-bottom: none; }
+    .api-row code {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+    .api-row .api-summary {
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      flex: 1;
+      min-width: 180px;
+    }
+    .api-method {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      min-width: 46px;
+      text-align: center;
+    }
+    .api-method.get { background: rgba(61, 220, 151, 0.16); color: var(--accent-green); }
+    .api-method.post { background: rgba(240, 194, 63, 0.16); color: var(--accent-yellow); }
+    .api-deprecated { text-decoration: line-through; opacity: 0.6; }
   </style>
   <script>
     // Glass is off on a first visit (the attribute on <html> is the default) and
@@ -1488,6 +1549,8 @@
       <button class="tab" data-tab="electrs">Electrs</button>
       <button class="tab" data-tab="raw">Raw TX</button>
       <button class="tab" data-tab="rpc">RPC Console</button>
+      <button class="tab" data-tab="logs">Logs</button>
+      <button class="tab" data-tab="api">API</button>
     </div>
 
     <!-- Mining Tab -->
@@ -1908,9 +1971,125 @@
             </p>
             <button class="btn btn-secondary" onclick="reconsiderChain()">Restore Invalidated Blocks</button>
           </div>
+
+          <div style="flex: 1; min-width: 250px;">
+            <h4 style="margin-bottom: 8px; font-size: 0.95rem;">Trigger a Reorg</h4>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px;">
+              Disconnect the last few blocks and mine a longer chain, to test how a wallet
+              handles a reorg. Mining empty blocks leaves the affected transactions unconfirmed.
+            </p>
+            <div class="inline-form" style="margin-bottom: 12px;">
+              <div class="form-group" style="max-width: 110px;">
+                <label>Depth</label>
+                <input type="number" id="reorgDepth" value="2" min="1" max="100">
+              </div>
+              <div class="form-group" style="max-width: 110px;">
+                <label>Extra</label>
+                <input type="number" id="reorgExtra" value="1" min="0" max="100">
+              </div>
+            </div>
+            <div class="checkbox-group" style="margin-bottom: 12px;">
+              <input type="checkbox" id="reorgEmptyBlocks" checked>
+              <label for="reorgEmptyBlocks">Mine empty blocks (leave transactions unconfirmed)</label>
+            </div>
+            <button class="btn btn-danger" onclick="executeReorg()">Reorg Chain</button>
+          </div>
         </div>
 
         <div id="resetResult" class="result-box" style="display:none; margin-top: 16px;"></div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-logs">
+      <div class="card">
+        <h2>Live Logs</h2>
+        <div class="inline-form log-toolbar">
+          <div class="form-group" style="max-width: 220px;">
+            <label>Source</label>
+            <select id="logSource" onchange="startLogStream()">
+              <option value="bitcoind">Bitcoin Core (debug.log)</option>
+              <option value="server">Dashboard server</option>
+              <option value="all">Both</option>
+            </select>
+          </div>
+          <div class="form-group" style="max-width: 240px;">
+            <label>Filter</label>
+            <input type="text" id="logFilter" placeholder="substring, or /regex/" oninput="renderLogView()">
+          </div>
+          <div class="form-group" style="max-width: 130px;">
+            <label>Backfill</label>
+            <input type="number" id="logLines" value="200" min="10" max="2000" onchange="startLogStream()">
+          </div>
+          <button class="btn btn-secondary" id="logPauseBtn" onclick="toggleLogPause()">Pause</button>
+          <button class="btn btn-secondary" onclick="clearLogView()">Clear</button>
+          <button class="btn btn-secondary" onclick="copyLogs()">Copy</button>
+          <button class="btn btn-secondary" onclick="downloadLogs()">Download</button>
+        </div>
+        <div class="checkbox-group" style="margin-bottom: 12px;">
+          <input type="checkbox" id="logAutoScroll" checked>
+          <label for="logAutoScroll">Auto-scroll</label>
+          <span id="logStatusBadge" class="badge badge-warning" style="margin-left: 12px;">idle</span>
+          <span id="logSourceHint" style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 12px;"></span>
+        </div>
+        <div id="logOutput" class="result-box log-pane"></div>
+      </div>
+
+      <div class="card">
+        <h2>Bitcoin Core Debug Categories</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Turn bitcoind logging categories on or off while it runs. Useful before reproducing a bug.
+          Changes take effect immediately and reset when bitcoind restarts.
+        </p>
+        <div id="logCategories" class="btn-group" style="flex-wrap: wrap;">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-api">
+      <div class="card">
+        <h2>Connect Other Apps</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          Everything this dashboard does is available over a local HTTP API, so a test suite,
+          a script or an AI agent can drive this regtest network directly.
+        </p>
+        <div id="apiConnectionInfo"><div class="empty-state">Loading...</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Common Recipes</h2>
+        <div id="apiRecipes"><div class="empty-state">Loading...</div></div>
+      </div>
+
+      <div class="card">
+        <h2>API Token</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          The API is open by default. Set <code>API_TOKEN</code> on the server to require
+          <code>Authorization: Bearer &lt;token&gt;</code>, then paste the token here so this
+          dashboard keeps working. It is stored in this browser only.
+        </p>
+        <div class="form-group">
+          <label>API token</label>
+          <input type="password" id="apiTokenInput" placeholder="Paste API token">
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="saveApiToken()">Save Token</button>
+          <button class="btn btn-secondary" onclick="clearApiToken()">Clear</button>
+        </div>
+        <div id="apiTokenResult" class="result-box" style="display:none;"></div>
+      </div>
+
+      <div class="card">
+        <h2>Endpoint Reference</h2>
+        <div class="inline-form">
+          <div class="form-group" style="max-width: 280px;">
+            <label>Search</label>
+            <input type="text" id="apiSearch" placeholder="faucet, reorg, logs, wallet..." oninput="renderApiReference()">
+          </div>
+          <button class="btn btn-secondary" onclick="window.open(API_BASE + '/openapi.json', '_blank')">Open OpenAPI Spec</button>
+          <button class="btn btn-secondary" onclick="window.open(API_BASE + '/llms.txt', '_blank')">Open llms.txt</button>
+        </div>
+        <div id="apiEndpointList"><div class="empty-state">Loading...</div></div>
       </div>
     </div>
   </div>
@@ -1971,25 +2150,81 @@
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         tab.classList.add('active');
         document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+        // Only stream logs while the Logs tab is actually on screen.
+        if (tab.dataset.tab === 'logs') { startLogStream(); loadDebugCategories(); } else stopLogStream();
+        if (tab.dataset.tab === 'api') loadApiTab();
       });
     });
 
     // API helper
     async function api(endpoint, options = {}) {
+      const token = getApiToken();
+      const response = await fetch(API_BASE + endpoint, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+          ...options.headers
+        }
+      });
+
+      let data;
       try {
-        const response = await fetch(API_BASE + endpoint, {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            ...options.headers
-          }
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Request failed');
-        return data;
-      } catch (error) {
-        throw error;
+        data = await response.json();
+      } catch (e) {
+        // An HTML body here means the request fell through to the SPA catch-all.
+        throw new Error('HTTP ' + response.status + ' (the response was not JSON)');
       }
+
+      if (response.status === 401) {
+        promptForApiToken();
+        throw new Error(data.error || 'API token required');
+      }
+      if (!response.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    // --- API token, stored per browser -------------------------------------
+    function getApiToken() {
+      try { return localStorage.getItem('dashboardApiToken') || ''; } catch (e) { return ''; }
+    }
+
+    function setApiTokenValue(token) {
+      try {
+        if (token) localStorage.setItem('dashboardApiToken', token);
+        else localStorage.removeItem('dashboardApiToken');
+      } catch (e) { /* storage unavailable */ }
+    }
+
+    // EventSource cannot set request headers, so SSE carries the token in the query.
+    function apiTokenQuery() {
+      const token = getApiToken();
+      return token ? '&access_token=' + encodeURIComponent(token) : '';
+    }
+
+    let apiTokenPromptShown = false;
+    function promptForApiToken() {
+      if (apiTokenPromptShown) return;
+      apiTokenPromptShown = true;
+      const token = window.prompt('This API requires a token. Paste the API_TOKEN configured on the server:');
+      if (token) {
+        setApiTokenValue(token.trim());
+        location.reload();
+      }
+      apiTokenPromptShown = false;
+    }
+
+    function saveApiToken() {
+      const value = document.getElementById('apiTokenInput').value.trim();
+      setApiTokenValue(value);
+      showResult('apiTokenResult', value ? 'Token saved in this browser.' : 'Token cleared.');
+      refreshAll();
+    }
+
+    function clearApiToken() {
+      setApiTokenValue('');
+      document.getElementById('apiTokenInput').value = '';
+      showResult('apiTokenResult', 'Token cleared.');
     }
 
     // Display result in a box
@@ -3609,6 +3844,414 @@
       setInterval(refreshStats, 10000);
       setInterval(checkConnection, 30000);
       setInterval(checkElectrsConnection, 30000);
+    });
+
+    // =======================================================================
+    // Logs tab
+    // =======================================================================
+    const LOG_VIEW_MAX = 2000;
+    let logStream = null;
+    let logPollTimer = null;
+    let logSseFailures = 0;
+    let logPaused = false;
+    let logPausedCount = 0;
+    let logEntries = [];
+    let logServerSeq = 0;
+    let logStreamStarted = false;
+
+    function setLogBadge(text, cls) {
+      const badge = document.getElementById('logStatusBadge');
+      if (!badge) return;
+      badge.textContent = text;
+      badge.className = 'badge ' + cls;
+    }
+
+    function matchesLogFilter(text) {
+      const raw = (document.getElementById('logFilter') || {}).value || '';
+      if (!raw) return true;
+      if (raw.length > 2 && raw.startsWith('/') && raw.endsWith('/')) {
+        try {
+          return new RegExp(raw.slice(1, -1), 'i').test(text);
+        } catch (e) {
+          return true; // an incomplete regex while typing should not blank the view
+        }
+      }
+      return text.toLowerCase().includes(raw.toLowerCase());
+    }
+
+    // Log lines carry addresses, raw hex and peer-supplied strings, so they are
+    // written with textContent and never interpolated into HTML.
+    function logRowFor(entry) {
+      const div = document.createElement('div');
+      div.className = 'log-line' + (entry.level === 'error' ? ' log-error'
+        : entry.level === 'warn' ? ' log-warn'
+        : entry.meta ? ' log-meta' : '');
+      div.textContent = entry.source === 'server' ? entry.text : entry.text;
+      return div;
+    }
+
+    function nearBottom(el) {
+      return el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    }
+
+    function pushLogEntry(entry) {
+      logEntries.push(entry);
+      if (logEntries.length > LOG_VIEW_MAX) logEntries.splice(0, logEntries.length - LOG_VIEW_MAX);
+
+      if (logPaused) {
+        logPausedCount++;
+        document.getElementById('logPauseBtn').textContent = 'Resume (' + logPausedCount + ')';
+        return;
+      }
+      if (!matchesLogFilter(entry.text)) return;
+
+      const out = document.getElementById('logOutput');
+      if (!out) return;
+      const stick = document.getElementById('logAutoScroll').checked && nearBottom(out);
+      out.appendChild(logRowFor(entry));
+      while (out.childElementCount > LOG_VIEW_MAX) out.removeChild(out.firstChild);
+      if (stick) out.scrollTop = out.scrollHeight;
+    }
+
+    // Re-renders from the buffer, so changing the filter is instant and does not
+    // restart the stream.
+    function renderLogView() {
+      const out = document.getElementById('logOutput');
+      if (!out) return;
+      out.textContent = '';
+      const frag = document.createDocumentFragment();
+      for (const entry of logEntries) {
+        if (matchesLogFilter(entry.text)) frag.appendChild(logRowFor(entry));
+      }
+      out.appendChild(frag);
+      if (document.getElementById('logAutoScroll').checked) out.scrollTop = out.scrollHeight;
+    }
+
+    function toggleLogPause() {
+      logPaused = !logPaused;
+      const btn = document.getElementById('logPauseBtn');
+      if (logPaused) {
+        btn.textContent = 'Resume';
+      } else {
+        logPausedCount = 0;
+        btn.textContent = 'Pause';
+        renderLogView();
+      }
+    }
+
+    function clearLogView() {
+      logEntries = [];
+      document.getElementById('logOutput').textContent = '';
+    }
+
+    function visibleLogText() {
+      return logEntries.filter(e => matchesLogFilter(e.text)).map(e => e.text).join('\n');
+    }
+
+    function copyLogs() {
+      copyToClipboard(visibleLogText());
+    }
+
+    function downloadLogs() {
+      const blob = new Blob([visibleLogText()], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'regtest-' + document.getElementById('logSource').value + '-logs.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function stopLogStream() {
+      if (logStream) { logStream.close(); logStream = null; }
+      if (logPollTimer) { clearInterval(logPollTimer); logPollTimer = null; }
+      logStreamStarted = false;
+    }
+
+    async function startLogStream() {
+      stopLogStream();
+      clearLogView();
+      logSseFailures = 0;
+      logStreamStarted = true;
+      setLogBadge('connecting', 'badge-warning');
+
+      await loadLogSources();
+
+      const source = document.getElementById('logSource').value;
+      const lines = document.getElementById('logLines').value || 200;
+      const url = API_BASE + '/logs/stream?source=' + encodeURIComponent(source) +
+        '&lines=' + encodeURIComponent(lines) + apiTokenQuery();
+
+      try {
+        logStream = new EventSource(url);
+      } catch (e) {
+        startLogPolling();
+        return;
+      }
+
+      logStream.onopen = () => { logSseFailures = 0; setLogBadge('live', 'badge-success'); };
+      logStream.addEventListener('line', (e) => {
+        const d = JSON.parse(e.data);
+        pushLogEntry({ text: d.text, level: d.level, source: d.source });
+      });
+      logStream.addEventListener('rotated', (e) => {
+        const d = JSON.parse(e.data);
+        pushLogEntry({ text: '--- log file ' + d.reason + ', following the new one ---', meta: true });
+      });
+      logStream.addEventListener('error', (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          pushLogEntry({ text: d.message, level: 'error' });
+        } catch (err) { /* transport error, handled by onerror */ }
+      });
+      // Umbrel proxies can buffer SSE into uselessness, so fall back to polling
+      // rather than leaving the tab looking broken.
+      logStream.onerror = () => {
+        setLogBadge('reconnecting', 'badge-warning');
+        if (++logSseFailures >= 2) {
+          stopLogStream();
+          logStreamStarted = true;
+          startLogPolling();
+        }
+      };
+    }
+
+    function startLogPolling() {
+      setLogBadge('polling', 'badge-warning');
+      pollLogsOnce();
+      logPollTimer = setInterval(pollLogsOnce, 2000);
+    }
+
+    async function pollLogsOnce() {
+      const source = document.getElementById('logSource').value;
+      try {
+        if (source === 'bitcoind' || source === 'all') {
+          const lines = document.getElementById('logLines').value || 200;
+          const data = await api('/logs/bitcoind?lines=' + encodeURIComponent(lines));
+          logEntries = data.lines.map(text => ({ text, source: 'bitcoind' }));
+          renderLogView();
+        }
+        if (source === 'server') {
+          const data = await api('/logs/server?limit=' + encodeURIComponent(document.getElementById('logLines').value || 200) +
+            '&since=' + logServerSeq);
+          for (const entry of data.entries) {
+            logServerSeq = Math.max(logServerSeq, entry.seq);
+            pushLogEntry({ text: '[' + entry.ts + '] ' + entry.msg, level: entry.level, source: 'server' });
+          }
+        }
+      } catch (e) {
+        setLogBadge('error', 'badge-danger');
+      }
+    }
+
+    async function loadLogSources() {
+      try {
+        const data = await api('/logs/sources');
+        const bitcoind = data.sources.find(s => s.id === 'bitcoind');
+        const option = document.querySelector('#logSource option[value="bitcoind"]');
+        const hint = document.getElementById('logSourceHint');
+        if (bitcoind && !bitcoind.available) {
+          option.disabled = true;
+          if (document.getElementById('logSource').value === 'bitcoind') {
+            document.getElementById('logSource').value = 'server';
+          }
+          hint.textContent = bitcoind.detail || ('Bitcoin Core logs unavailable: ' + bitcoind.reason);
+        } else {
+          option.disabled = false;
+          hint.textContent = bitcoind ? (Math.round(bitcoind.sizeBytes / 1024) + ' KB on disk') : '';
+        }
+      } catch (e) {
+        document.getElementById('logSourceHint').textContent = e.message;
+      }
+    }
+
+    async function loadDebugCategories() {
+      const container = document.getElementById('logCategories');
+      try {
+        const data = await api('/logs/debug-categories');
+        container.innerHTML = '';
+        Object.keys(data.categories).sort().forEach(name => {
+          const on = data.categories[name];
+          const btn = document.createElement('button');
+          btn.className = 'btn ' + (on ? 'btn-primary' : 'btn-secondary');
+          btn.textContent = name;
+          btn.onclick = () => toggleDebugCategory(name, !on);
+          container.appendChild(btn);
+        });
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state">Could not load categories</div>';
+      }
+    }
+
+    async function toggleDebugCategory(name, enable) {
+      try {
+        await api('/logs/debug-categories', {
+          method: 'POST',
+          body: JSON.stringify(enable ? { include: [name] } : { exclude: [name] })
+        });
+        loadDebugCategories();
+      } catch (e) {
+        alert('Could not change logging category: ' + e.message);
+      }
+    }
+
+    // =======================================================================
+    // API tab
+    // =======================================================================
+    let apiSpecCache = null;
+
+    function esc(value) {
+      const div = document.createElement('div');
+      div.textContent = value === undefined || value === null ? '' : String(value);
+      return div.innerHTML;
+    }
+
+    async function loadApiTab() {
+      document.getElementById('apiTokenInput').value = getApiToken();
+      try {
+        const [connection, spec] = await Promise.all([
+          api('/connection'),
+          fetch(API_BASE + '/openapi.json').then(r => r.json())
+        ]);
+        apiSpecCache = spec;
+        renderApiConnection(connection);
+        renderApiRecipes(connection);
+        renderApiReference();
+      } catch (e) {
+        document.getElementById('apiConnectionInfo').innerHTML =
+          '<div class="empty-state">' + esc(e.message) + '</div>';
+      }
+    }
+
+    function renderApiConnection(c) {
+      const rpcAuth = c.bitcoinRpc.auth || {};
+      const creds = rpcAuth.password
+        ? esc(rpcAuth.username) + ':' + esc(rpcAuth.password)
+        : esc(rpcAuth.credentialsWithheld || 'withheld');
+
+      document.getElementById('apiConnectionInfo').innerHTML = `
+        <div class="stats-grid" style="margin: 0;">
+          <div class="stat-card">
+            <h3>API Base</h3>
+            <div class="value" style="font-size: 0.95rem;"><code>${esc(c.dashboard.apiBase)}</code></div>
+            <button class="copy-btn" onclick="copyToClipboard('${esc(c.dashboard.apiBase)}')">Copy</button>
+          </div>
+          <div class="stat-card">
+            <h3>Network</h3>
+            <div class="value">
+              <span class="badge ${c.network === 'regtest' ? 'badge-success' : 'badge-warning'}">${esc(c.network)}</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <h3>Auth</h3>
+            <div class="value">
+              <span class="badge ${c.dashboard.auth.required ? 'badge-warning' : 'badge-success'}">
+                ${c.dashboard.auth.required ? 'token required' : 'open'}
+              </span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <h3>Electrum</h3>
+            <div class="value" style="font-size: 0.95rem;"><code>${esc(c.electrum.connectionString)}</code></div>
+            <button class="copy-btn" onclick="copyToClipboard('${esc(c.electrum.connectionString)}')">Copy</button>
+          </div>
+        </div>
+        <div style="margin-top: 16px; padding: 14px; border: 1px solid var(--glass-border); border-radius: var(--r-sm);">
+          <h4 style="margin-bottom: 8px; font-size: 0.95rem;">Bitcoin Core RPC</h4>
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 8px;">
+            ${esc(c.bitcoinRpc.note)}
+          </p>
+          <div style="font-family: var(--font-mono); font-size: 0.8rem;">
+            <div>url: <code>${esc(c.bitcoinRpc.url)}</code></div>
+            <div>wallet: <code>${esc(c.bitcoinRpc.wallet)}</code></div>
+            <div>credentials: <code>${creds}</code></div>
+          </div>
+        </div>`;
+    }
+
+    function renderApiRecipes(c) {
+      const rows = Object.entries(c.recipes).map(([name, cmd]) => `
+        <div class="api-row">
+          <code style="flex: 1; min-width: 240px;">${esc(cmd)}</code>
+          <button class="copy-btn" onclick="copyToClipboard(${JSON.stringify(cmd).replace(/"/g, '&quot;')})">Copy</button>
+        </div>`).join('');
+      document.getElementById('apiRecipes').innerHTML = rows;
+    }
+
+    // The reference is rendered from the served OpenAPI document, so it cannot
+    // drift from what the server actually implements.
+    function renderApiReference() {
+      const container = document.getElementById('apiEndpointList');
+      if (!apiSpecCache) return;
+      const query = (document.getElementById('apiSearch').value || '').toLowerCase();
+
+      const groups = {};
+      for (const [path, methods] of Object.entries(apiSpecCache.paths)) {
+        for (const [method, op] of Object.entries(methods)) {
+          const haystack = (method + ' ' + path + ' ' + (op.summary || '') + ' ' + (op.description || '')).toLowerCase();
+          if (query && !haystack.includes(query)) continue;
+          const tag = (op.tags && op.tags[0]) || 'Other';
+          (groups[tag] = groups[tag] || []).push({ path, method, op });
+        }
+      }
+
+      const tags = Object.keys(groups);
+      if (!tags.length) {
+        container.innerHTML = '<div class="empty-state">No endpoints match that search.</div>';
+        return;
+      }
+
+      container.innerHTML = tags.map(tag => `
+        <details class="api-group" ${query ? 'open' : ''}>
+          <summary>${esc(tag)} <span style="color: var(--text-secondary); font-weight: 400;">(${groups[tag].length})</span></summary>
+          ${groups[tag].map(({ path, method, op }) => {
+            const curl = op['x-curl'] ? op['x-curl'].replace(/\{\{base\}\}/g, location.origin) :
+              (method === 'get' ? 'curl -s ' + location.origin + path : 'curl -sX ' + method.toUpperCase() + ' ' + location.origin + path);
+            const withAuth = getApiToken()
+              ? curl.replace('curl -s', 'curl -s -H "Authorization: Bearer ' + getApiToken() + '"')
+              : curl;
+            return `
+              <div class="api-row">
+                <span class="api-method ${esc(method)}">${esc(method.toUpperCase())}</span>
+                <code class="${op.deprecated ? 'api-deprecated' : ''}">${esc(path)}</code>
+                <span class="api-summary">${esc(op.summary || '')}</span>
+                <button class="copy-btn" onclick="copyToClipboard(${JSON.stringify(withAuth).replace(/"/g, '&quot;')})">Copy curl</button>
+              </div>`;
+          }).join('')}
+        </details>`).join('');
+    }
+
+    // =======================================================================
+    // Reorg (Danger Zone)
+    // =======================================================================
+    async function executeReorg() {
+      const depth = parseInt(document.getElementById('reorgDepth').value, 10) || 1;
+      const extra = parseInt(document.getElementById('reorgExtra').value, 10);
+      const includeMempool = !document.getElementById('reorgEmptyBlocks').checked;
+
+      if (!confirm('Disconnect the last ' + depth + ' block(s) and mine a replacement chain?')) return;
+
+      try {
+        const result = await api('/chain/reorg', {
+          method: 'POST',
+          body: JSON.stringify({ depth, extra: Number.isFinite(extra) ? extra : 1, includeMempool })
+        });
+        showResult('resetResult', result);
+        refreshAll();
+      } catch (e) {
+        showResult('resetResult', e.message, true);
+      }
+    }
+
+    window.addEventListener('beforeunload', stopLogStream);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopLogStream();
+      } else if (logStreamStarted && document.getElementById('tab-logs').classList.contains('active')) {
+        startLogStream();
+      }
     });
   </script>
 </body>

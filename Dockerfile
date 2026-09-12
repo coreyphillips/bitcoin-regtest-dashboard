@@ -5,11 +5,13 @@ WORKDIR /app
 # Ensure app directory is owned by the node user (uid 1000)
 RUN chown -R node:node /app
 
-# Copy backend files
+# Install dependencies first so this layer stays cached across source changes
 COPY --chown=node:node backend/package*.json ./
-RUN npm install --production
+RUN npm ci --omit=dev
 
-COPY --chown=node:node backend/server.js ./
+# Copy the whole backend, not just server.js: the app is split across
+# lib/ and routes/ and would fail at boot with MODULE_NOT_FOUND otherwise.
+COPY --chown=node:node backend/ ./
 
 # Copy frontend files
 COPY --chown=node:node frontend/ ./frontend/
