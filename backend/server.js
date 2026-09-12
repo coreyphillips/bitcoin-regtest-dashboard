@@ -1,201 +1,55 @@
+// Bitcoin Regtest Dashboard: HTTP API and static frontend.
+//
+// The API is documented at GET /api (index), GET /api/openapi.json (spec) and
+// GET /api/llms.txt (compact reference). lib/operations.js is the source of
+// truth for all three, and scripts/check-openapi.js fails the build when it
+// disagrees with the routes registered below.
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const http = require('http');
-
-const app = express();
-app.use(cors());
-app.use(bodyParser.json());
-
+const path = require('path');
 const fs = require('fs');
 
-// Bitcoin RPC Configuration
-const RPC_HOST = process.env.BITCOIN_RPC_HOST || 'bitcoin';
-const RPC_PORT = process.env.BITCOIN_RPC_PORT || '18443';
-const RPC_WALLET = process.env.BITCOIN_RPC_WALLET || 'regtest_wallet';
-const COOKIE_FILE = process.env.BITCOIN_COOKIE_FILE || '';
+const cfg = require('./lib/config');
+const logbuffer = require('./lib/logbuffer');
 
-// RPC credentials - either from cookie file or environment variables
-let RPC_USER = process.env.BITCOIN_RPC_USER || '';
-let RPC_PASS = process.env.BITCOIN_RPC_PASS || '';
+// Patch the console before anything else is required, so startup logging
+// (cookie reads, wallet initialization retries) is captured for /api/logs/server.
+logbuffer.patchConsole();
 
-// Function to read cookie file
-function readCookieFile() {
-  if (COOKIE_FILE && fs.existsSync(COOKIE_FILE)) {
-    try {
-      const cookie = fs.readFileSync(COOKIE_FILE, 'utf8').trim();
-      const [user, pass] = cookie.split(':');
-      if (user && pass) {
-        RPC_USER = user;
-        RPC_PASS = pass;
-        console.log(`Read RPC credentials from cookie file: ${COOKIE_FILE}`);
-        return true;
-      }
-    } catch (e) {
-      console.error(`Failed to read cookie file: ${e.message}`);
-    }
-  }
-  return false;
-}
+const { bitcoinRPC, electrsRPC, checkElectrsTCP, getScripthashFromAddress } = require('./lib/rpc');
+const { resolveMiningAddress, autoMineStatus, stopAutoMine, startAutoMine } = require('./lib/mining');
+const { initializeWallet } = require('./lib/wallet');
+const { requireToken } = require('./lib/auth');
+const { apiNotFound, errorHandler } = require('./lib/http');
+const metaRoutes = require('./routes/meta');
+const logsRoutes = require('./routes/logs');
+const driverRoutes = require('./routes/driver');
 
-// Try to read cookie file on startup
-if (COOKIE_FILE) {
-  readCookieFile();
-  // Re-read cookie file periodically (it can change on bitcoind restart)
-  setInterval(readCookieFile, 30000);
-}
+const ELECTRS_HOST = cfg.ELECTRS_HOST;
+const ELECTRS_PORT = cfg.ELECTRS_PORT;
 
-// Default credentials if no cookie file
-if (!RPC_USER) RPC_USER = 'regtest';
-if (!RPC_PASS) RPC_PASS = 'regtest';
+const app = express();
+app.disable('x-powered-by');
+app.use(cors({ origin: cfg.CORS_ORIGIN }));
+app.use(bodyParser.json({ limit: '5mb' })); // raw transaction hex can be large
 
-// Electrs Configuration
-const ELECTRS_HOST = process.env.ELECTRS_HOST || 'electrs';
-const ELECTRS_PORT = process.env.ELECTRS_PORT || '50001';
+// ---------------------------------------------------------------------------
+// Route order below is load bearing:
+//   1. public discovery endpoints, reachable without a token
+//   2. the auth gate
+//   3. everything else under /api
+//   4. a JSON 404 for unknown /api paths
+//   5. the static frontend and its SPA catch-all
+// Anything registered after the catch-all at the bottom is unreachable.
+// ---------------------------------------------------------------------------
 
-// Bitcoin RPC call helper
-// useWallet: true for wallet-specific calls, false for node-level calls
-async function bitcoinRPC(method, params = [], useWallet = false) {
-  return new Promise((resolve, reject) => {
-    const postData = JSON.stringify({
-      jsonrpc: '1.0',
-      id: Date.now(),
-      method: method,
-      params: params
-    });
-
-    // Use /wallet/<name> path for wallet-specific operations
-    const path = useWallet ? `/wallet/${RPC_WALLET}` : '/';
-
-    console.log(`RPC Call: ${method} useWallet=${useWallet} path=${path} host=${RPC_HOST}:${RPC_PORT}`);
-
-    const options = {
-      hostname: RPC_HOST,
-      port: RPC_PORT,
-      path: path,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData),
-        'Authorization': 'Basic ' + Buffer.from(`${RPC_USER}:${RPC_PASS}`).toString('base64')
-      }
-    };
-
-    const req = http.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => data += chunk);
-      res.on('end', () => {
-        console.log(`RPC Response for ${method}: ${data.substring(0, 200)}`);
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) {
-            reject(new Error(parsed.error.message || 'RPC Error'));
-          } else {
-            resolve(parsed.result);
-          }
-        } catch (e) {
-          reject(new Error('Failed to parse RPC response'));
-        }
-      });
-    });
-
-    req.on('error', (e) => reject(e));
-    req.write(postData);
-    req.end();
-  });
-}
-
-const net = require('net');
-
-// Check if Electrs TCP port is reachable
-async function checkElectrsTCP() {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    const timeout = 3000;
-
-    socket.setTimeout(timeout);
-
-    socket.on('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-
-    socket.on('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-
-    socket.on('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-
-    socket.connect(parseInt(ELECTRS_PORT), ELECTRS_HOST);
-  });
-}
-
-// Electrs uses TCP Electrum protocol, not HTTP
-// This function sends a simple Electrum JSON-RPC request
-async function electrsRPC(method, params = []) {
-  return new Promise((resolve, reject) => {
-    const socket = new net.Socket();
-    const timeout = 5000;
-    let data = '';
-
-    socket.setTimeout(timeout);
-
-    const request = JSON.stringify({
-      jsonrpc: '2.0',
-      id: Date.now(),
-      method: method,
-      params: params
-    }) + '\n';
-
-    socket.on('connect', () => {
-      socket.write(request);
-    });
-
-    socket.on('data', (chunk) => {
-      data += chunk.toString();
-      // Electrum responses are newline-delimited
-      if (data.includes('\n')) {
-        socket.destroy();
-        try {
-          const response = JSON.parse(data.trim());
-          if (response.error) {
-            reject(new Error(response.error.message || 'Electrs RPC error'));
-          } else {
-            resolve(response.result);
-          }
-        } catch (e) {
-          reject(new Error('Failed to parse Electrs response'));
-        }
-      }
-    });
-
-    socket.on('timeout', () => {
-      socket.destroy();
-      reject(new Error('Electrs connection timeout'));
-    });
-
-    socket.on('error', (e) => {
-      socket.destroy();
-      reject(new Error('Electrs connection error: ' + e.message));
-    });
-
-    socket.connect(parseInt(ELECTRS_PORT), ELECTRS_HOST);
-  });
-}
-
-// Health check endpoint
-app.get('/api/health', async (req, res) => {
-  try {
-    const info = await bitcoinRPC('getblockchaininfo');
-    res.json({ status: 'ok', chain: info.chain, blocks: info.blocks });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-});
+app.use('/api', metaRoutes.publicRouter);
+app.use('/api', requireToken);
+app.use('/api', metaRoutes.privateRouter);
+app.use('/api', logsRoutes);
+app.use('/api', driverRoutes);
 
 // Get blockchain info
 app.get('/api/blockchain/info', async (req, res) => {
@@ -247,34 +101,6 @@ app.get('/api/mempool/raw', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// Resolve a usable mining address: use the provided one, otherwise get a fresh
-// wallet address (creating/loading the wallet if needed).
-async function resolveMiningAddress(address) {
-  if (address) return address;
-
-  try {
-    return await bitcoinRPC('getnewaddress', ['mining', 'bech32'], true);
-  } catch (e) {
-    // If wallet doesn't exist, create one
-    if (e.message.includes('wallet')) {
-      try {
-        await bitcoinRPC('createwallet', ['regtest_wallet']);
-        return await bitcoinRPC('getnewaddress', ['mining', 'bech32'], true);
-      } catch (walletError) {
-        // Wallet might already exist, try loading it
-        try {
-          await bitcoinRPC('loadwallet', ['regtest_wallet']);
-          return await bitcoinRPC('getnewaddress', ['mining', 'bech32'], true);
-        } catch (loadError) {
-          throw new Error('Could not create or load wallet: ' + loadError.message);
-        }
-      }
-    }
-    throw e;
-  }
-}
-
 // Mine blocks to address
 app.post('/api/mine', async (req, res) => {
   try {
@@ -292,71 +118,18 @@ app.post('/api/mine', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 // ---------------------------------------------------------------------------
 // Auto-mine: a single server-side job that mines blocks at a fixed interval.
 // By default it runs indefinitely until stopped; an optional duration makes it
 // stop on its own at the deadline. It runs independently of any browser tab, so
 // mining continues even if the dashboard is closed. Only one job at a time.
+// The job itself lives in lib/mining.js.
 // ---------------------------------------------------------------------------
-let autoMineJob = null;
-
-function autoMineStatus() {
-  if (!autoMineJob) return { running: false };
-  const indefinite = !autoMineJob.endsAt;
-  const remainingSeconds = indefinite
-    ? null
-    : Math.max(0, Math.round((autoMineJob.endsAt - Date.now()) / 1000));
-  return {
-    running: true,
-    blocksMined: autoMineJob.blocksMined,
-    indefinite: indefinite,
-    remainingSeconds: remainingSeconds,
-    intervalSeconds: autoMineJob.intervalSeconds,
-    blocksPerTick: autoMineJob.blocksPerTick,
-    address: autoMineJob.address,
-    startedAt: autoMineJob.startedAt,
-    lastError: autoMineJob.lastError || null
-  };
-}
-
-function stopAutoMine() {
-  if (autoMineJob) {
-    if (autoMineJob.timer) clearInterval(autoMineJob.timer);
-    if (autoMineJob.stopTimer) clearTimeout(autoMineJob.stopTimer);
-  }
-  autoMineJob = null;
-}
-
-async function autoMineTick() {
-  const job = autoMineJob;
-  if (!job) return;
-
-  // Stop cleanly once the deadline has passed (only when a duration is set)
-  if (job.endsAt && Date.now() >= job.endsAt) {
-    stopAutoMine();
-    return;
-  }
-
-  // Skip if the previous tick is still mining (can happen with large batches)
-  if (job.ticking) return;
-  job.ticking = true;
-  try {
-    const hashes = await bitcoinRPC('generatetoaddress', [job.blocksPerTick, job.address]);
-    job.blocksMined += Array.isArray(hashes) ? hashes.length : 0;
-    job.lastError = null;
-  } catch (e) {
-    job.lastError = e.message;
-    console.error(`Auto-mine tick error: ${e.message}`);
-  } finally {
-    if (autoMineJob === job) job.ticking = false;
-  }
-}
 
 // Start an auto-mine job
 app.post('/api/mine/auto/start', async (req, res) => {
   try {
-    if (autoMineJob) {
+    if (autoMineStatus().running) {
       return res.status(409).json({ error: 'Auto-mine is already running. Stop it first.' });
     }
 
@@ -378,41 +151,8 @@ app.post('/api/mine/auto/start', async (req, res) => {
       return res.status(400).json({ error: 'Blocks per tick must be between 1 and 1000' });
     }
 
-    // Resolve the mining address once and reuse it for the whole run so the
-    // coinbase rewards land on a single address instead of being scattered.
-    const miningAddress = await resolveMiningAddress(address);
-
-    const now = Date.now();
-    const endsAt = durationMinutes ? now + durationMinutes * 60000 : null;
-    autoMineJob = {
-      timer: null,
-      stopTimer: null,
-      startedAt: now,
-      endsAt: endsAt,
-      intervalSeconds: intervalSeconds,
-      blocksPerTick: blocksPerTick,
-      address: miningAddress,
-      blocksMined: 0,
-      ticking: false,
-      lastError: null
-    };
-    console.log(`Auto-mine started: ${durationMinutes ? durationMinutes + 'm' : 'until stopped'}, every ${intervalSeconds}s, ${blocksPerTick} block(s)/tick to ${miningAddress}`);
-
-    // Mine one batch immediately for instant feedback, then on the interval
-    await autoMineTick();
-    if (autoMineJob) {
-      autoMineJob.timer = setInterval(autoMineTick, intervalSeconds * 1000);
-      // With a duration set, hard stop exactly at the deadline regardless of
-      // interval size. Without one, the job keeps running until stopped.
-      if (endsAt) {
-        autoMineJob.stopTimer = setTimeout(() => {
-          console.log(`Auto-mine finished: ${autoMineJob ? autoMineJob.blocksMined : 0} block(s) mined`);
-          stopAutoMine();
-        }, endsAt - Date.now());
-      }
-    }
-
-    res.json(autoMineStatus());
+    const status = await startAutoMine({ durationMinutes, intervalSeconds, blocksPerTick, address });
+    res.json(status);
   } catch (error) {
     stopAutoMine();
     res.status(500).json({ error: error.message });
@@ -421,10 +161,9 @@ app.post('/api/mine/auto/start', async (req, res) => {
 
 // Stop the auto-mine job
 app.post('/api/mine/auto/stop', (req, res) => {
-  const wasRunning = !!autoMineJob;
-  const blocksMined = autoMineJob ? autoMineJob.blocksMined : 0;
+  const status = autoMineStatus();
   stopAutoMine();
-  res.json({ running: false, stopped: wasRunning, blocksMined: blocksMined });
+  res.json({ running: false, stopped: status.running, blocksMined: status.blocksMined || 0 });
 });
 
 // Get auto-mine status
@@ -710,13 +449,13 @@ app.post('/api/transaction/cancel', async (req, res) => {
   }
 });
 
-// Get block by hash
-app.get('/api/block/:hash', async (req, res) => {
+// Note: the specific block paths must stay registered before /api/block/:hash,
+// otherwise the wildcard swallows them.
+// Get best block hash
+app.get('/api/block/best', async (req, res) => {
   try {
-    const { hash } = req.params;
-    const verbosity = parseInt(req.query.verbosity) || 1;
-    const block = await bitcoinRPC('getblock', [hash, verbosity]);
-    res.json(block);
+    const hash = await bitcoinRPC('getbestblockhash');
+    res.json({ hash });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -734,11 +473,13 @@ app.get('/api/block/height/:height', async (req, res) => {
   }
 });
 
-// Get best block hash
-app.get('/api/block/best', async (req, res) => {
+// Get block by hash
+app.get('/api/block/:hash', async (req, res) => {
   try {
-    const hash = await bitcoinRPC('getbestblockhash');
-    res.json({ hash });
+    const { hash } = req.params;
+    const verbosity = parseInt(req.query.verbosity) || 1;
+    const block = await bitcoinRPC('getblock', [hash, verbosity]);
+    res.json(block);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -882,8 +623,24 @@ app.post('/api/psbt/finalize', async (req, res) => {
 app.post('/api/wallet/importaddress', async (req, res) => {
   try {
     const { address, label = '', rescan = false } = req.body;
-    await bitcoinRPC('importaddress', [address, label, rescan], true);
-    res.json({ success: true });
+    try {
+      await bitcoinRPC('importaddress', [address, label, rescan], true);
+      res.json({ success: true, method: 'importaddress' });
+    } catch (legacyError) {
+      // importaddress needs a legacy wallet, which Bitcoin Core has removed.
+      // Descriptor wallets watch an address via an addr() descriptor instead.
+      const descriptor = await bitcoinRPC('getdescriptorinfo', [`addr(${address})`]);
+      const result = await bitcoinRPC('importdescriptors', [[{
+        desc: descriptor.descriptor,
+        timestamp: rescan ? 0 : 'now',
+        label: label,
+        active: false,
+        internal: false
+      }]], true);
+      const failure = Array.isArray(result) && result.find((r) => !r.success);
+      if (failure) throw new Error(failure.error ? failure.error.message : 'importdescriptors failed');
+      res.json({ success: true, method: 'importdescriptors', descriptor: descriptor.descriptor });
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -893,8 +650,21 @@ app.post('/api/wallet/importaddress', async (req, res) => {
 app.post('/api/wallet/importprivkey', async (req, res) => {
   try {
     const { privkey, label = '', rescan = false } = req.body;
-    await bitcoinRPC('importprivkey', [privkey, label, rescan], true);
-    res.json({ success: true });
+    try {
+      await bitcoinRPC('importprivkey', [privkey, label, rescan], true);
+      res.json({ success: true, method: 'importprivkey' });
+    } catch (legacyError) {
+      // Legacy wallets are gone, so import the key as a wpkh() descriptor.
+      const descriptor = await bitcoinRPC('getdescriptorinfo', [`wpkh(${privkey})`]);
+      const result = await bitcoinRPC('importdescriptors', [[{
+        desc: descriptor.descriptor,
+        timestamp: rescan ? 0 : 'now',
+        label: label
+      }]], true);
+      const failure = Array.isArray(result) && result.find((r) => !r.success);
+      if (failure) throw new Error(failure.error ? failure.error.message : 'importdescriptors failed');
+      res.json({ success: true, method: 'importdescriptors', descriptor: descriptor.descriptor });
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -907,7 +677,11 @@ app.get('/api/wallet/dumpprivkey/:address', async (req, res) => {
     const privkey = await bitcoinRPC('dumpprivkey', [address], true);
     res.json({ privkey });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    // dumpprivkey needs a legacy wallet, which Bitcoin Core has removed.
+    res.status(500).json({
+      error: error.message,
+      hint: 'dumpprivkey requires a legacy wallet, which Bitcoin Core no longer supports. Use GET /api/wallet/descriptors to read the wallet keys instead.'
+    });
   }
 });
 
@@ -1013,7 +787,10 @@ app.post('/api/chain/reconsider', async (req, res) => {
   try {
     // Get block hash at height 1
     try {
-      const blockHash = await bitcoinRPC('getblockhash', [1]);
+      // Defaults to height 1 (undoing a full chain reset) but accepts a
+      // specific hash, which is what POST /api/chain/reorg hands back.
+      const requested = req.body && req.body.blockHash;
+      const blockHash = requested || await bitcoinRPC('getblockhash', [1]);
       await bitcoinRPC('reconsiderblock', [blockHash]);
 
       const newHeight = await bitcoinRPC('getblockcount');
@@ -1032,7 +809,6 @@ app.post('/api/chain/reconsider', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 // ============================================
 // Electrs API Endpoints (Electrum Protocol)
 // ============================================
@@ -1161,33 +937,60 @@ app.get('/api/electrs/tx/:txid', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// Helper: Convert address to scripthash for Electrum protocol
-// This is a simplified version - real implementation needs proper address parsing
-const crypto = require('crypto');
-
-async function getScripthashFromAddress(address) {
-  // For Electrum protocol, we need to convert address to scripthash
-  // This requires deriving the scriptPubKey and hashing it
-  // Use Bitcoin Core to get the scriptPubKey
+// Chain tip height as Electrs sees it. Comparing this against the node's own
+// height is how you tell that Electrs has fallen behind.
+app.get('/api/electrs/blocks/tip/height', async (req, res) => {
   try {
-    const validation = await bitcoinRPC('validateaddress', [address]);
-    if (!validation.isvalid) {
-      throw new Error('Invalid address');
-    }
-
-    // Get scriptPubKey hex
-    let scriptPubKey = validation.scriptPubKey;
-
-    // SHA256 hash, then reverse bytes for Electrum protocol
-    const hash = crypto.createHash('sha256').update(Buffer.from(scriptPubKey, 'hex')).digest();
-    const reversed = Buffer.from(hash).reverse();
-    return reversed.toString('hex');
+    const header = await electrsRPC('blockchain.headers.subscribe');
+    res.json(header.height);
   } catch (error) {
-    throw new Error('Failed to convert address to scripthash: ' + error.message);
+    res.status(500).json({ error: error.message });
   }
-}
+});
 
+// Fee estimates keyed by confirmation target, in sat/vB.
+app.get('/api/electrs/fee-estimates', async (req, res) => {
+  try {
+    const targets = [1, 2, 3, 6, 10, 20, 144, 504, 1008];
+    const estimates = {};
+    for (const target of targets) {
+      try {
+        // Electrum reports BTC per kvB; the rest of the world wants sat/vB.
+        const btcPerKvb = await electrsRPC('blockchain.estimatefee', [target]);
+        estimates[target] = btcPerKvb > 0 ? Math.round(btcPerKvb * 100000 * 1000) / 1000 : 1;
+      } catch (e) {
+        estimates[target] = 1;
+      }
+    }
+    res.json(estimates);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Descriptor-wallet replacements for the removed legacy import/dump RPCs.
+app.get('/api/wallet/descriptors', async (req, res) => {
+  try {
+    const includePrivate = req.query.private !== 'false';
+    const result = await bitcoinRPC('listdescriptors', [includePrivate], true);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/wallet/importdescriptors', async (req, res) => {
+  try {
+    const { requests } = req.body;
+    if (!Array.isArray(requests) || requests.length === 0) {
+      return res.status(400).json({ error: 'requests must be a non-empty array of importdescriptors request objects' });
+    }
+    const result = await bitcoinRPC('importdescriptors', [requests], true);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 // Generic RPC call (for advanced users)
 app.post('/api/rpc', async (req, res) => {
   try {
@@ -1199,69 +1002,41 @@ app.post('/api/rpc', async (req, res) => {
   }
 });
 
-// Serve frontend static files
-app.use(express.static('/app/frontend'));
+// A typo'd /api path must not fall through to the SPA catch-all below, which
+// would answer 200 with HTML and make every client's JSON parse throw.
+app.use('/api', apiNotFound);
+app.use(errorHandler);
+
+// Serve frontend static files. The container path wins when present; the
+// relative path is what makes `npm start` work outside Docker.
+const FRONTEND_DIR = process.env.FRONTEND_DIR ||
+  (fs.existsSync('/app/frontend') ? '/app/frontend' : path.resolve(__dirname, '..', 'frontend'));
+app.use(express.static(FRONTEND_DIR));
 
 // Fallback to index.html for SPA routing
 app.get('*', (req, res) => {
-  res.sendFile('/app/frontend/index.html');
+  res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
-// Ensure wallet exists and is loaded on startup
-async function initializeWallet() {
-  const maxRetries = 30;
-  const retryDelay = 5000; // 5 seconds
+// Exported so scripts/check-openapi.js can introspect the route table without
+// starting a server. Keep the require.main guard below for that reason.
+module.exports = app;
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`Wallet initialization attempt ${attempt}/${maxRetries}...`);
+if (require.main === module) {
+  app.listen(cfg.PORT, '0.0.0.0', () => {
+    console.log(`Bitcoin Regtest Dashboard API running on port ${cfg.PORT}`);
+    console.log(`Connecting to Bitcoin RPC at ${cfg.RPC_HOST}:${cfg.RPC_PORT}`);
+    console.log(`API index: /api  |  OpenAPI: /api/openapi.json  |  Logs: /api/logs/sources`);
+    console.log(`API auth: ${cfg.API_TOKEN ? 'bearer token required' : 'disabled (open)'}`);
+    console.log(`Frontend served from ${FRONTEND_DIR}`);
 
-      // Check if wallet is already loaded
-      const loadedWallets = await bitcoinRPC('listwallets');
-      if (loadedWallets.includes(RPC_WALLET)) {
-        console.log(`Wallet '${RPC_WALLET}' is already loaded.`);
-        return true;
+    // Initialize wallet after server starts (Bitcoin Core may take time to be ready)
+    initializeWallet().then(success => {
+      if (success) {
+        console.log('Wallet initialization complete.');
+      } else {
+        console.log('Warning: Wallet initialization failed. Some features may not work until Bitcoin Core is available.');
       }
-
-      // Try to load the wallet
-      try {
-        await bitcoinRPC('loadwallet', [RPC_WALLET]);
-        console.log(`Wallet '${RPC_WALLET}' loaded successfully.`);
-        return true;
-      } catch (loadError) {
-        // Wallet doesn't exist, create it
-        if (loadError.message.includes('not found') || loadError.message.includes('does not exist')) {
-          console.log(`Wallet '${RPC_WALLET}' not found, creating...`);
-          await bitcoinRPC('createwallet', [RPC_WALLET]);
-          console.log(`Wallet '${RPC_WALLET}' created successfully.`);
-          return true;
-        }
-        throw loadError;
-      }
-    } catch (error) {
-      console.log(`Wallet initialization failed: ${error.message}`);
-      if (attempt < maxRetries) {
-        console.log(`Retrying in ${retryDelay / 1000} seconds...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      }
-    }
-  }
-
-  console.error(`Failed to initialize wallet after ${maxRetries} attempts.`);
-  return false;
-}
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Bitcoin Regtest Dashboard API running on port ${PORT}`);
-  console.log(`Connecting to Bitcoin RPC at ${RPC_HOST}:${RPC_PORT}`);
-
-  // Initialize wallet after server starts (Bitcoin Core may take time to be ready)
-  initializeWallet().then(success => {
-    if (success) {
-      console.log('Wallet initialization complete.');
-    } else {
-      console.log('Warning: Wallet initialization failed. Some features may not work until Bitcoin Core is available.');
-    }
+    });
   });
-});
+}

@@ -4,7 +4,7 @@ name: Bitcoin Regtest Dashboard
 tagline: Development toolkit for Bitcoin regtest
 icon: https://raw.githubusercontent.com/coreyphillips/bitcoin-regtest-dashboard/main/icon.svg
 category: bitcoin
-version: "1.0.4"
+version: "1.1.0"
 port: 3000
 description: >-
   A self-contained development dashboard with its own Bitcoin Core regtest node and Electrs instance. No external dependencies required.
@@ -34,6 +34,10 @@ description: >-
 
   - PSBT support
 
+  - Live log viewer for Bitcoin Core and the dashboard
+
+  - Documented local HTTP API with an OpenAPI spec, so test suites and AI agents can drive the network
+
 
   Perfect for Bitcoin developers who need quick access to regtest node functionality
   for testing wallets, applications, and Bitcoin integrations.
@@ -49,9 +53,19 @@ gallery:
   - https://raw.githubusercontent.com/coreyphillips/bitcoin-regtest-dashboard/main/gallery/screenshot3.png
   - https://raw.githubusercontent.com/coreyphillips/bitcoin-regtest-dashboard/main/gallery/screenshot4.png
 releaseNotes: >-
-  - Added an auto-mine feature to mine blocks at a set interval, either until stopped or for a chosen duration
+  - Added a documented local HTTP API so test suites, scripts and AI agents can drive the regtest network from other apps
 
-  - Upgraded Bitcoin Core to v31.0
+  - Added a Logs tab that tails Bitcoin Core and dashboard logs live, with filtering and debug category control
+
+  - Added an API tab with connection details, copyable commands and a searchable endpoint reference
+
+  - Added a faucet endpoint that funds an address and confirms it in one call, mining first when the wallet has no mature balance
+
+  - Added reorg and long-polling wait endpoints for testing how wallets handle chain changes
+
+  - Added optional bearer token auth, off by default
+
+  - Upgraded Bitcoin Core to v31.1
 dependencies: []
 path: ""
 defaultUsername: ""

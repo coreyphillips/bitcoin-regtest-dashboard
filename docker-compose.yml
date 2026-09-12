@@ -10,7 +10,7 @@
 services:
   # Bitcoin Core in regtest mode (uses cookie auth)
   bitcoin:
-    image: ghcr.io/getumbrel/docker-bitcoind:v31.0
+    image: ghcr.io/getumbrel/docker-bitcoind:v31.1
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -27,11 +27,12 @@ services:
           -disablewallet=0 \
           -zmqpubrawblock=tcp://0.0.0.0:28332 \
           -zmqpubrawtx=tcp://0.0.0.0:28333 &
-        BITCOIND_PID=$!
+        BITCOIND_PID=$$!
         # Wait for cookie file and make directory + file readable
         while [ ! -f /data/.bitcoin/regtest/.cookie ]; do sleep 1; done
         chmod 755 /data/.bitcoin/regtest
         chmod 644 /data/.bitcoin/regtest/.cookie
+        chmod 644 /data/.bitcoin/regtest/debug.log 2>/dev/null || true
         # Wait for RPC to be ready, then ensure wallet exists and mine initial block for electrs
         sleep 2
         bitcoin-cli -regtest -rpccookiefile=/data/.bitcoin/regtest/.cookie createwallet "regtest_wallet" 2>/dev/null || \
@@ -40,13 +41,14 @@ services:
         # Create flag to signal permissions are set
         touch /data/.bitcoin/regtest/.ready
         # Background loop to keep permissions fixed (bitcoind may recreate cookie)
-        while kill -0 $BITCOIND_PID 2>/dev/null; do
+        while kill -0 $$BITCOIND_PID 2>/dev/null; do
           chmod 755 /data/.bitcoin/regtest 2>/dev/null
           chmod 644 /data/.bitcoin/regtest/.cookie 2>/dev/null
+          chmod 644 /data/.bitcoin/regtest/debug.log 2>/dev/null
           sleep 5
         done &
         # Keep container running by waiting on bitcoind
-        wait $BITCOIND_PID
+        wait $$BITCOIND_PID
     volumes:
       - bitcoin_data:/data/.bitcoin
     # Ports only exposed internally via Docker network (no host binding to avoid conflicts)
@@ -98,6 +100,14 @@ services:
       ELECTRS_HOST: electrs
       ELECTRS_PORT: 50001
       ELECTRS_EXTERNAL_PORT: 60401
+      BITCOIN_DEBUG_LOG: /bitcoin/.bitcoin/regtest/debug.log
+      BITCOIN_P2P_PORT: 18444
+      BITCOIN_ZMQ_RAWBLOCK: tcp://bitcoin:28332
+      BITCOIN_ZMQ_RAWTX: tcp://bitcoin:28333
+      # Leave empty to keep the API open. Set a value to require
+      # "Authorization: Bearer <token>" on /api (health and the OpenAPI spec
+      # stay reachable so clients can discover that a token is needed).
+      API_TOKEN: ${API_TOKEN:-}
     volumes:
       - bitcoin_data:/bitcoin/.bitcoin:ro
     ports:
