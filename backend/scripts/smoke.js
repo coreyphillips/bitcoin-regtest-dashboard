@@ -207,6 +207,13 @@ async function expectOk(method, path, body) {
       assert(r.status === 200, `expected 200 on timeout, got ${r.status}`);
       assert(r.json.timedOut === true && r.json.satisfied === false, `unexpected ${JSON.stringify(r.json)}`);
     });
+    await check('GET /api/wait/tx honours confirmations=0 on a mempool transaction', async () => {
+      const to = await expectOk('POST', '/api/wallet/newaddress', {});
+      const sent = await expectOk('POST', '/api/wallet/send', { address: to.address, amount: 0.001 });
+      const w = await expectOk('GET', `/api/wait/tx/${sent.txid}?confirmations=0&timeout=5`);
+      assert(w.target.confirmations === 0, `confirmations=0 was read as ${w.target.confirmations}`);
+      assert(w.satisfied === true && w.timedOut === false, `unexpected ${JSON.stringify(w)}`);
+    });
     await check('GET /api/wait/tx rejects a malformed txid', async () => {
       const r = await call('GET', '/api/wait/tx/nope?timeout=2');
       assert(r.status === 400, `expected 400, got ${r.status}`);
