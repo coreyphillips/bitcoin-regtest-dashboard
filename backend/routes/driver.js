@@ -372,7 +372,11 @@ router.get('/wait/height/:height', waitHandler(async (req) => {
 router.get('/wait/tx/:txid', waitHandler(async (req) => {
   const txid = String(req.params.txid);
   if (!/^[0-9a-fA-F]{64}$/.test(txid)) throw new HttpError(400, 'txid must be 64 hex characters');
-  const wanted = Math.max(0, parseInt(req.query.confirmations, 10) || 1);
+  // `|| 1` would defeat confirmations=0, because 0 is falsy: the one value
+  // Math.max(0, ...) exists to allow. Parse the way every other numeric
+  // default in this file does.
+  const rawConfirmations = parseInt(req.query.confirmations, 10);
+  const wanted = Math.max(0, Number.isFinite(rawConfirmations) ? rawConfirmations : 1);
 
   return async () => {
     let confirmations = null;
