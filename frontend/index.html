@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-glass="off">
+<html lang="en" data-glass="on">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,38 +14,49 @@
        reused as the glow that sits under the cards and in the wallpaper.
        ============================================================ */
     :root {
-      /* Theme colors, rewritten at runtime by the theme panel */
-      --accent-orange: #3b82f6;
-      --accent-2: #59a0ff;
-      --bg-primary: #0a0f17;
-      --bg-secondary: #111827;
-      --bg-tertiary: #1e2333;
-      --border-color: #2d3243;
-      --text-primary: #f0f6fc;
-      --text-secondary: #8b949e;
+      /* ---- Theme colours. The theme panel still rewrites these four and
+             their channel triplets; everything below them derives. ---- */
+      --accent-orange: #3ecfff;
+      --bg-primary: #080b14;
+      --bg-secondary: #111725;
+      --text-primary: #e6edf9;
 
       /* Channel triplets for the same colors, so alpha can vary */
-      --accent-rgb: 59, 130, 246;
-      --bg-rgb: 10, 15, 23;
-      --card-rgb: 17, 24, 39;
-      --text-rgb: 240, 246, 252;
+      --accent-rgb: 62, 207, 255;
+      --bg-rgb: 8, 11, 20;
+      --card-rgb: 17, 23, 37;
+      --text-rgb: 230, 237, 249;
 
-      /* Accent companions for the wallpaper mesh (accent, hue +130, hue -110) */
-      --glow-a-rgb: 59, 130, 246;
-      --glow-b-rgb: 59, 246, 130;
-      --glow-c-rgb: 246, 59, 130;
+      /* ---- Derived in CSS rather than in JS, which is what lets the four
+             pickers drive the rail, the ribbon and every hairline. "in srgb"
+             is deliberate: an exact per-channel lerp, so the contrast ratios
+             below hold for any theme the user lands on. ---- */
+      --accent-2:       color-mix(in srgb, var(--accent-orange) 84%, var(--text-primary));
+      --text-secondary: color-mix(in srgb, var(--text-primary) 76%, var(--bg-primary));
+      --text-muted:     color-mix(in srgb, var(--text-primary) 62%, var(--bg-primary));
+      --border-color:   color-mix(in srgb, var(--bg-primary) 86%, var(--text-primary));
+      --border-strong:  color-mix(in srgb, var(--bg-primary) 74%, var(--text-primary));
+      --bg-tertiary:    color-mix(in srgb, var(--bg-primary) 94%, var(--text-primary));
+
+      /* Accent companions for the wallpaper mesh (accent, hue +38, hue -34).
+         Analogous rather than complementary, so one accent makes one
+         atmosphere instead of a three-color rainbow. */
+      --glow-a-rgb: 62, 207, 255;
+      --glow-b-rgb: 62, 138, 255;
+      --glow-c-rgb: 62, 255, 209;
 
       /* Readable text on top of a filled accent surface */
-      --accent-contrast: #06101f;
+      --accent-contrast: #05101a;
 
-      /* Semantic colors */
-      --accent-green: #3ddc97;
-      --accent-red: #ff5c61;
-      --accent-yellow: #f0c23f;
-      --accent-blue: #6ea8ff;
-      --green-rgb: 61, 220, 151;
-      --red-rgb: 255, 92, 97;
-      --yellow-rgb: 240, 194, 63;
+      /* Semantic colors. Deliberately clear of every preset accent, so a
+         failed RPC never renders identically to the theme. */
+      --accent-green: #2bd98c;
+      --accent-red: #ff5f6d;
+      --accent-yellow: #f5c84a;
+      --accent-blue: #7fb4ff;
+      --green-rgb: 43, 217, 140;
+      --red-rgb: 255, 95, 109;
+      --yellow-rgb: 245, 200, 74;
 
       /* Glass */
       --glass-bg: rgba(var(--card-rgb), 0.52);
@@ -66,11 +77,13 @@
       );
       /* Accent light bleeding in through the pane's edges */
       --glass-inner-glow: inset 0 0 60px -42px rgba(var(--accent-rgb), 0.55);
-      --glass-inner: rgba(255, 255, 255, 0.04);
-      --glass-inner-2: rgba(255, 255, 255, 0.07);
-      --glass-border: rgba(255, 255, 255, 0.09);
-      --glass-border-bright: rgba(255, 255, 255, 0.18);
-      --hairline: rgba(255, 255, 255, 0.06);
+      /* Restated against --text-rgb so they flip direction with the theme
+         instead of needing a light-mode override */
+      --glass-inner: rgba(var(--text-rgb), 0.045);
+      --glass-inner-2: rgba(var(--text-rgb), 0.08);
+      --glass-border: rgba(var(--text-rgb), 0.10);
+      --glass-border-bright: rgba(var(--text-rgb), 0.20);
+      --hairline: rgba(var(--text-rgb), 0.07);
       --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
       --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
       --blur: 26px;
@@ -84,32 +97,110 @@
       --accent-dim: rgba(var(--accent-rgb), 0.12);
       --card-glow: 0 18px 44px -22px rgba(var(--accent-rgb), 0.3);
       --card-glow-hover: 0 22px 56px -20px rgba(var(--accent-rgb), 0.5);
-      --spotlight: rgba(var(--accent-rgb), 0.05);
+      --spotlight: rgba(var(--accent-rgb), 0.06);
+
+      /* Spacing scale. Every padding in this file used to be a px literal. */
+      --s-1: 4px;  --s-2: 8px;   --s-3: 12px; --s-4: 16px; --s-5: 20px;
+      --s-6: 24px; --s-8: 32px;  --s-10: 40px; --s-12: 48px;
+      --gutter: clamp(16px, 2.2vw, 28px);
+
+      /* Layout geometry */
+      --rail-w: 224px;
+      --rail-w-collapsed: 68px;
+      --topbar-h: 58px;
+
+      /* Ribbon geometry. Single source of truth: the shift animation
+         translates by exactly --cf-step per block. */
+      --cf-w: clamp(84px, 6.5vw, 108px);
+      --cf-h: calc(var(--cf-w) * 0.9);
+      --cf-depth: 10px;
+      --cf-gap: 12px;
+      --cf-step: calc(var(--cf-w) + var(--cf-gap) + var(--cf-depth));
+      --cf-empty: rgba(var(--text-rgb), 0.16);
 
       /* Shape + motion */
-      --r-sm: 10px;
-      --r-md: 16px;
-      --r-lg: 22px;
+      --r-xs: 4px;
+      --r-sm: 6px;
+      --r-md: 10px;
+      --r-lg: 14px;
       --r-full: 999px;
       --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+      --ease-spring: cubic-bezier(0.34, 1.32, 0.42, 1);
       --dur-fast: 150ms;
       --dur-med: 300ms;
+      --dur-slow: 520ms;
+      --dur-xslow: 900ms;
 
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      /* Elevation. "Flat but luminous" is a 1px top light-catch, not a drop
+         shadow; the heavier two are reserved for things that float. */
+      --e-1: inset 0 1px 0 rgba(var(--text-rgb), 0.05);
+      --e-2: 0 2px 10px -6px rgba(0, 0, 0, 0.55);
+      --e-3: 0 24px 56px -28px rgba(0, 0, 0, 0.7);
+      --e-accent: 0 0 0 1px rgba(var(--accent-rgb), 0.34),
+                  0 10px 30px -22px rgba(var(--accent-rgb), 0.6);
+      --grid-line: rgba(var(--text-rgb), 0.028);
+
+      /* Type. The root stays at 16px on purpose: 40+ rem literals in this
+         file would silently rescale if html { font-size } moved. */
+      --fs-micro: 0.6875rem;
+      --fs-xs: 0.75rem;
+      --fs-sm: 0.8125rem;
+      --fs-base: 0.875rem;
+      --fs-md: 1rem;
+      --fs-lg: 1.125rem;
+      --fs-xl: 1.375rem;
+      --fs-stat: clamp(1.05rem, 2.4vw, 1.75rem);
+      --fs-hero: clamp(1.25rem, 2.2vw, 1.6rem);
+      --ls-caps: 0.14em;
+      --ls-tight: -0.015em;
+      --ls-num: -0.02em;
+
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                   'Helvetica Neue', Arial, sans-serif;
+      /* The old stack named no Windows or Linux face, so the whole numeric
+         identity fell back to Courier New everywhere but macOS. */
+      --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, 'Cascadia Mono',
+                   'Segoe UI Mono', 'Roboto Mono', Menlo, Consolas,
+                   'Liberation Mono', monospace;
 
       color-scheme: dark;
+    }
+
+    /* color-mix carries six tokens, and --text-secondary alone has 46
+       consumers. Without it those declarations are invalid at computed-value
+       time and every one of them inherits --text-primary, which erases the
+       secondary text tier outright. A wrong-but-present palette beats that. */
+    @supports not (color: color-mix(in srgb, red, blue)) {
+      :root {
+        --accent-2: #59d4fe;
+        --text-secondary: #b1b7c2;
+        --text-muted: #9297a2;
+        --border-color: #272b34;
+        --border-strong: #3c414d;
+        --bg-tertiary: #151922;
+      }
+
+      :root[data-theme="light"] {
+        --accent-2: #3b7fc4;
+        --text-secondary: #484d59;
+        --text-muted: #676c77;
+        --border-color: #dadde1;
+        --border-strong: #b8bcc4;
+        --bg-tertiary: #ebeef0;
+      }
     }
 
     /* Light themes need darker hairlines and stronger semantics to stay legible
        against pale glass. JS flips data-theme from the background's luminance. */
     :root[data-theme="light"] {
-      --accent-green: #0f9d63;
-      --accent-red: #d93a40;
-      --accent-yellow: #b8890b;
+      --accent-green: #0b7a44;
+      --accent-red: #c2333c;
+      --accent-yellow: #9c7409;
       --accent-blue: #2f6fdb;
-      --green-rgb: 15, 157, 99;
-      --red-rgb: 217, 58, 64;
-      --yellow-rgb: 184, 137, 11;
+      --green-rgb: 11, 122, 68;
+      --red-rgb: 194, 51, 60;
+      --yellow-rgb: 156, 116, 9;
 
       --glass-bg: rgba(var(--card-rgb), 0.58);
       --glass-bg-heavy: rgba(var(--card-rgb), 0.88);
@@ -128,17 +219,15 @@
       --glass-inner-glow: inset 0 0 60px -44px rgba(var(--accent-rgb), 0.45);
       /* Pale glass needs almost no brightening or it blows out to flat white */
       --glass-filter: blur(var(--blur)) saturate(140%) brightness(1.01);
-      --glass-inner: rgba(20, 30, 60, 0.045);
-      --glass-inner-2: rgba(20, 30, 60, 0.08);
-      --glass-border: rgba(20, 30, 60, 0.1);
-      --glass-border-bright: rgba(20, 30, 60, 0.2);
-      --hairline: rgba(20, 30, 60, 0.08);
       --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.65);
       --glass-shadow: 0 8px 32px rgba(35, 45, 80, 0.12);
 
       --card-glow: 0 18px 44px -22px rgba(var(--accent-rgb), 0.45);
       --card-glow-hover: 0 22px 56px -20px rgba(var(--accent-rgb), 0.65);
       --spotlight: rgba(var(--accent-rgb), 0.07);
+      --e-2: 0 2px 10px -6px rgba(30, 41, 64, 0.16);
+      --e-3: 0 24px 56px -28px rgba(30, 41, 64, 0.24);
+      --cf-empty: rgba(var(--text-rgb), 0.22);
 
       color-scheme: light;
     }
@@ -159,19 +248,13 @@
       --spotlight: transparent;
       --glass-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
       --glass-highlight: 0 0 0 0 transparent;
+      --grid-line: transparent;
+      --e-accent: 0 0 0 1px rgba(var(--accent-rgb), 0.34);
     }
 
     :root[data-glass="off"] .ambient::before,
     :root[data-glass="off"] .ambient::after {
       display: none;
-    }
-
-    :root[data-glass="off"] .stat-card .value {
-      text-shadow: none;
-    }
-
-    :root[data-glass="off"] .quick-action-btn svg {
-      filter: none;
     }
 
     :root[data-glass="off"] .theme-panel-overlay,
@@ -187,7 +270,7 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: var(--font-sans);
       background: var(--bg-primary);
       color: var(--text-primary);
       line-height: 1.6;
@@ -284,10 +367,7 @@
        backdrop-filter only on top level surfaces. Nesting blurs is slow and
        renders badly in Safari, so inner surfaces use flat translucency. */
     header,
-    .stat-card,
-    .card,
-    .tabs,
-    .quick-action-btn,
+    .rail,
     .status-indicator,
     .theme-panel,
     .modal-box {
@@ -303,10 +383,7 @@
 
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
       header,
-      .stat-card,
-      .card,
-      .tabs,
-      .quick-action-btn,
+      .rail,
       .status-indicator,
       .theme-panel,
       .modal-box {
@@ -316,14 +393,12 @@
 
     /* Cursor spotlight. JS sets --spot-x/--spot-y on the hovered surface. */
     .stat-card,
-    .card,
-    .quick-action-btn {
+    .card {
       position: relative;
     }
 
     .stat-card::before,
-    .card::before,
-    .quick-action-btn::before {
+    .card::before {
       content: '';
       position: absolute;
       inset: 0;
@@ -332,70 +407,35 @@
       opacity: 0;
       transition: opacity 400ms ease;
       background: radial-gradient(
-        360px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+        220px circle at var(--spot-x, 50%) var(--spot-y, 50%),
         var(--spotlight),
         transparent 65%
       );
     }
 
     .stat-card:hover::before,
-    .card:hover::before,
-    .quick-action-btn:hover::before {
+    .card:hover::before {
       opacity: 1;
     }
 
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-
-    /* ---------- Header ---------- */
+    /* ---------- Header / status ----------
+       <header> is only ever the topbar now; its layout lives in .topbar. */
     header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 16px;
       flex-wrap: wrap;
-      padding: 14px 20px;
-      border-radius: var(--r-lg);
-      margin: 8px 0 26px;
       position: relative;
-      z-index: 10;
-    }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .logo svg {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    }
-
-    .logo h1 {
-      font-size: 1.35rem;
-      font-weight: 620;
-      letter-spacing: -0.01em;
-    }
-
-    .logo span {
-      color: var(--accent-orange);
     }
 
     .status-indicator {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 7px 14px;
-      border-radius: var(--r-full);
-      font-size: 0.85rem;
+      padding: 6px 10px;
+      border-radius: var(--r-sm);
+      font-size: var(--fs-xs);
       color: var(--text-secondary);
-      box-shadow: var(--glass-highlight);
+      box-shadow: none;
     }
 
     .status-dot {
@@ -422,43 +462,54 @@
     /* ---------- Stat cards ---------- */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 18px;
-      margin-bottom: 26px;
+      grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+      gap: var(--s-3);
+      margin-bottom: var(--s-5);
     }
 
     .stat-card {
+      position: relative;
+      padding: var(--s-4);
+      border: 1px solid var(--border-color);
       border-radius: var(--r-md);
-      padding: 18px 20px;
-      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
-                  var(--glass-shadow), var(--card-glow);
-      transition: transform var(--dur-med) var(--ease-out-expo),
-                  border-color var(--dur-fast) ease,
-                  box-shadow var(--dur-med) ease;
+      background: var(--bg-tertiary);
+      box-shadow: var(--e-1);
+      transition: border-color var(--dur-fast) ease;
     }
 
-    .stat-card:hover {
-      transform: translateY(-2px);
-      border-color: var(--glass-border-bright);
-      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
-                  var(--glass-shadow), var(--card-glow-hover);
+    /* A short accent rule in the corner rather than a lift on hover: these are
+       readouts, not buttons, and seven panels render dozens at a time. */
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      width: 22px;
+      height: 2px;
+      background: var(--accent-orange);
+      opacity: 0.55;
+      border-radius: var(--r-md) 0 0 0;
     }
+
+    .stat-card:hover { border-color: var(--border-strong); }
 
     .stat-card h3 {
-      color: var(--text-secondary);
-      font-size: 0.72rem;
-      font-weight: 500;
-      margin-bottom: 6px;
+      color: var(--text-muted);
+      font-size: var(--fs-micro);
+      font-weight: 600;
+      margin-bottom: var(--s-2);
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: var(--ls-caps);
     }
 
     .stat-card .value {
-      font-size: clamp(1rem, 3vw, 1.7rem);
-      font-weight: 640;
-      letter-spacing: -0.02em;
-      color: var(--accent-orange);
-      text-shadow: 0 0 24px var(--accent-glow);
+      /* The floor stays low on purpose: these tiles already ellipsise, and
+         raising it would clip values like "0.00000000 BTC". */
+      font-size: var(--fs-stat);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: var(--ls-num);
+      color: var(--text-primary);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -469,48 +520,9 @@
       word-break: break-all;
     }
 
-    /* ---------- Tabs ---------- */
-    .tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 20px;
-      padding: 6px;
-      border-radius: var(--r-full);
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-
-    .tabs::-webkit-scrollbar {
-      display: none;
-    }
-
-    .tab {
-      padding: 9px 18px;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: var(--r-full);
-      color: var(--text-secondary);
-      cursor: pointer;
-      font-size: 0.9rem;
-      font-weight: 500;
-      white-space: nowrap;
-      transition: color var(--dur-fast) ease,
-                  background var(--dur-fast) ease,
-                  box-shadow var(--dur-med) ease;
-    }
-
-    .tab:hover {
-      color: var(--text-primary);
-      background: var(--glass-inner);
-    }
-
-    .tab.active {
-      color: var(--accent-orange);
-      background: var(--accent-dim);
-      border-color: rgba(var(--accent-rgb), 0.35);
-      box-shadow: var(--glass-highlight), 0 2px 18px -4px var(--accent-glow);
-    }
-
+    /* ---------- Panels ----------
+       The pill strip is gone; .rail-item carries the nav styling now.
+       .tab-content is the panel machinery and stays as it is. */
     .tab-content {
       display: none;
     }
@@ -527,34 +539,32 @@
 
     /* ---------- Cards ---------- */
     .card {
+      padding: var(--s-5);
+      margin-bottom: var(--s-4);
+      border: 1px solid var(--border-color);
       border-radius: var(--r-lg);
-      padding: 22px;
-      margin-bottom: 18px;
-      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
-                  var(--glass-shadow), var(--card-glow);
-      transition: border-color var(--dur-fast) ease, box-shadow var(--dur-med) ease;
+      background: var(--bg-secondary);
+      box-shadow: var(--e-1);
+      transition: border-color var(--dur-fast) ease;
     }
 
-    .card:hover {
-      border-color: var(--glass-border-bright);
-      box-shadow: var(--glass-highlight), var(--glass-inner-glow),
-                  var(--glass-shadow), var(--card-glow-hover);
-    }
+    .card:hover { border-color: var(--border-strong); }
 
     .card h2 {
-      font-size: 1.05rem;
-      font-weight: 620;
-      letter-spacing: -0.01em;
-      margin-bottom: 18px;
+      font-size: var(--fs-md);
+      font-weight: 600;
+      letter-spacing: var(--ls-tight);
+      margin-bottom: var(--s-4);
+      padding-bottom: var(--s-3);
+      border-bottom: 1px solid var(--hairline);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--s-2);
     }
 
     /* Card contents sit above the spotlight layer */
     .card > *,
-    .stat-card > *,
-    .quick-action-btn > * {
+    .stat-card > * {
       position: relative;
       z-index: 1;
     }
@@ -566,21 +576,24 @@
 
     .form-group label {
       display: block;
-      margin-bottom: 6px;
-      color: var(--text-secondary);
-      font-size: 0.85rem;
+      margin-bottom: var(--s-2);
+      color: var(--text-muted);
+      font-size: var(--fs-micro);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: var(--ls-caps);
     }
 
     .form-group input,
     .form-group select,
     .form-group textarea {
       width: 100%;
-      padding: 11px 13px;
-      background: var(--glass-inner);
-      border: 1px solid var(--glass-border);
+      padding: 9px 11px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
       border-radius: var(--r-sm);
       color: var(--text-primary);
-      font-size: 0.95rem;
+      font-size: var(--fs-base);
       font-family: inherit;
       transition: border-color var(--dur-fast) ease,
                   background var(--dur-fast) ease,
@@ -596,16 +609,16 @@
     .form-group input:hover,
     .form-group select:hover,
     .form-group textarea:hover {
-      border-color: var(--glass-border-bright);
+      border-color: var(--border-strong);
     }
 
     .form-group input:focus,
     .form-group select:focus,
     .form-group textarea:focus {
       outline: none;
-      background: var(--glass-inner-2);
+      background: var(--bg-tertiary);
       border-color: var(--accent-orange);
-      box-shadow: 0 0 0 3px var(--accent-dim);
+      box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.28);
     }
 
     .form-group select option {
@@ -616,7 +629,7 @@
     .form-group textarea {
       min-height: 100px;
       font-family: var(--font-mono);
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
       resize: vertical;
     }
 
@@ -636,14 +649,14 @@
 
     .checkbox-group label {
       color: var(--text-secondary);
-      font-size: 0.88rem;
+      font-size: var(--fs-base);
       cursor: pointer;
       margin: 0;
     }
 
     .inline-form {
       display: flex;
-      gap: 12px;
+      gap: var(--s-3);
       align-items: flex-end;
       flex-wrap: wrap;
     }
@@ -656,12 +669,12 @@
 
     /* ---------- Buttons ---------- */
     .btn {
-      padding: 11px 20px;
+      padding: 9px 16px;
       border: 1px solid transparent;
       border-radius: var(--r-sm);
       cursor: pointer;
-      font-size: 0.9rem;
-      font-weight: 560;
+      font-size: var(--fs-base);
+      font-weight: 500;
       font-family: inherit;
       display: inline-flex;
       align-items: center;
@@ -678,26 +691,24 @@
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent-orange), var(--accent-2));
+      background: var(--accent-orange);
       color: var(--accent-contrast);
-      border-color: rgba(var(--accent-rgb), 0.5);
-      box-shadow: var(--glass-highlight), 0 4px 18px -6px var(--accent-glow);
+      border-color: var(--accent-orange);
     }
 
     .btn-primary:hover {
       filter: brightness(1.08);
-      box-shadow: var(--glass-highlight), 0 6px 26px -6px rgba(var(--accent-rgb), 0.7);
     }
 
     .btn-secondary {
-      background: var(--glass-inner);
+      background: var(--bg-tertiary);
       color: var(--text-primary);
-      border-color: var(--glass-border);
+      border-color: var(--border-color);
     }
 
     .btn-secondary:hover {
-      background: var(--glass-inner-2);
-      border-color: var(--glass-border-bright);
+      border-color: var(--border-strong);
+      color: var(--accent-orange);
     }
 
     .btn-success {
@@ -729,13 +740,13 @@
     }
 
     .copy-btn {
-      background: var(--glass-inner);
-      border: 1px solid var(--glass-border);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
       color: var(--text-secondary);
-      padding: 3px 9px;
-      border-radius: 6px;
+      padding: 3px 8px;
+      border-radius: var(--r-xs);
       cursor: pointer;
-      font-size: 0.78rem;
+      font-size: var(--fs-micro);
       font-family: inherit;
       transition: all var(--dur-fast) ease;
     }
@@ -746,45 +757,6 @@
       background: var(--accent-dim);
     }
 
-    /* ---------- Quick actions ---------- */
-    .quick-actions {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 20px;
-    }
-
-    .quick-action-btn {
-      padding: 16px 22px;
-      border-radius: var(--r-md);
-      color: var(--text-primary);
-      cursor: pointer;
-      font-family: inherit;
-      font-size: 0.9rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      min-width: 120px;
-      box-shadow: var(--glass-highlight), var(--glass-shadow);
-      transition: transform var(--dur-med) var(--ease-out-expo),
-                  border-color var(--dur-fast) ease,
-                  box-shadow var(--dur-med) ease;
-    }
-
-    .quick-action-btn:hover {
-      transform: translateY(-3px);
-      border-color: rgba(var(--accent-rgb), 0.45);
-      box-shadow: var(--glass-highlight), var(--glass-shadow), var(--card-glow-hover);
-    }
-
-    .quick-action-btn svg {
-      width: 26px;
-      height: 26px;
-      color: var(--accent-orange);
-      filter: drop-shadow(0 0 8px var(--accent-glow));
-    }
-
     /* ---------- Tables ---------- */
     table {
       width: 100%;
@@ -793,16 +765,21 @@
 
     th, td {
       text-align: left;
-      padding: 11px 12px;
+      padding: 9px var(--s-3);
       border-bottom: 1px solid var(--hairline);
     }
 
+    td {
+      font-size: var(--fs-sm);
+      font-variant-numeric: tabular-nums;
+    }
+
     th {
-      color: var(--text-secondary);
-      font-weight: 500;
-      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: var(--fs-micro);
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: var(--ls-caps);
     }
 
     tbody tr {
@@ -811,6 +788,12 @@
 
     tbody tr:hover {
       background: var(--glass-inner);
+    }
+
+    /* Marks the hovered row at its leading edge, the same vocabulary the
+       rail uses for the active section. */
+    tbody tr:hover td:first-child {
+      box-shadow: inset 2px 0 0 var(--accent-orange);
     }
 
     .truncate {
@@ -823,10 +806,10 @@
     /* ---------- Badges ---------- */
     .badge {
       display: inline-block;
-      padding: 3px 10px;
-      border-radius: var(--r-full);
-      font-size: 0.75rem;
-      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: var(--r-xs);
+      font-size: var(--fs-micro);
+      font-weight: 600;
       border: 1px solid transparent;
     }
 
@@ -850,13 +833,14 @@
 
     /* ---------- Result boxes ---------- */
     .result-box {
-      background: rgba(var(--bg-rgb), 0.45);
-      border: 1px solid var(--glass-border);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-left: 2px solid var(--border-strong);
       border-radius: var(--r-sm);
-      padding: 14px;
-      margin-top: 16px;
+      padding: var(--s-3);
+      margin-top: var(--s-4);
       font-family: var(--font-mono);
-      font-size: 0.82rem;
+      font-size: var(--fs-sm);
       line-height: 1.55;
       overflow-x: auto;
       white-space: pre-wrap;
@@ -866,23 +850,21 @@
       box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 
+    /* A left rule, not a coloured glow: showResult() adds .success to every
+       plain result, so the old treatment made routine output look like an event. */
     .result-box.success {
-      border-color: rgba(var(--green-rgb), 0.45);
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2),
-                  0 0 20px -6px rgba(var(--green-rgb), 0.35);
+      border-left-color: var(--accent-green);
     }
 
     .result-box.error {
-      border-color: rgba(var(--red-rgb), 0.45);
+      border-left-color: var(--accent-red);
       color: var(--accent-red);
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2),
-                  0 0 20px -6px rgba(var(--red-rgb), 0.35);
     }
 
     .grid-2 {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      gap: var(--s-4);
     }
 
     /* ---------- Misc ---------- */
@@ -900,10 +882,16 @@
       to { transform: rotate(360deg); }
     }
 
+    /* 34 of these across the panels, so "nothing here yet" has to look composed */
     .empty-state {
+      max-width: 48ch;
+      margin: 0 auto;
+      padding: var(--s-6);
+      border: 1px dashed var(--border-color);
+      border-radius: var(--r-md);
       text-align: center;
-      padding: 40px;
-      color: var(--text-secondary);
+      font-size: var(--fs-sm);
+      color: var(--text-muted);
     }
 
     .regtest-only.disabled {
@@ -924,13 +912,14 @@
     }
 
     .network-warning {
-      background: rgba(var(--yellow-rgb), 0.1);
-      border: 1px solid rgba(var(--yellow-rgb), 0.4);
-      border-radius: var(--r-md);
-      padding: 12px 16px;
-      margin-bottom: 20px;
+      background: rgba(var(--yellow-rgb), 0.08);
+      border: 1px solid rgba(var(--yellow-rgb), 0.35);
+      border-left: 2px solid var(--accent-yellow);
+      border-radius: var(--r-sm);
+      padding: var(--s-3) var(--s-4);
+      margin-bottom: var(--s-4);
+      font-size: var(--fs-sm);
       color: var(--accent-yellow);
-      box-shadow: var(--glass-highlight), 0 8px 32px -12px rgba(var(--yellow-rgb), 0.4);
       display: none;
     }
 
@@ -947,31 +936,6 @@
     }
 
     /* ---------- Theme panel ---------- */
-    .settings-btn {
-      background: var(--glass-inner);
-      border: 1px solid var(--glass-border);
-      color: var(--text-secondary);
-      width: 38px;
-      height: 38px;
-      border-radius: var(--r-sm);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all var(--dur-fast) ease;
-    }
-
-    .settings-btn:hover {
-      color: var(--accent-orange);
-      background: var(--accent-dim);
-      border-color: rgba(var(--accent-rgb), 0.45);
-    }
-
-    .settings-btn svg {
-      width: 19px;
-      height: 19px;
-    }
-
     .theme-panel {
       position: fixed;
       top: 0;
@@ -1272,6 +1236,877 @@
       flex: 1;
     }
 
+    /* ============================================================
+       Chain Instrument: the app shell and the Chainflow ribbon.
+
+       The shell is one grid, a sticky rail and a workspace, and the
+       workspace is a plain block on purpose: a sticky child of an auto-sized
+       grid row has no travel and never engages. minmax(0, 1fr) on the column
+       and min-width: 0 on the workspace are what stop .log-pane's pre-wrapped
+       lines from stretching the track and shoving the rail off-screen.
+       ============================================================ */
+
+    .app {
+      display: grid;
+      grid-template-columns: var(--rail-w) minmax(0, 1fr);
+      align-items: start;
+      min-height: 100dvh;
+      max-width: 1720px;
+      margin: 0 auto;
+    }
+
+    /* A faint survey grid under everything, so the ground reads as a surface
+       rather than a void. Sits above .ambient (-2) and below content. */
+    .app::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+      background-size: 64px 64px;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      z-index: 100;
+      padding: var(--s-2) var(--s-4);
+      border-radius: 0 0 var(--r-sm) 0;
+      background: var(--accent-orange);
+      color: var(--accent-contrast);
+      font-size: var(--fs-sm);
+      font-weight: 600;
+    }
+
+    .skip-link:focus {
+      left: 0;
+    }
+
+    /* ---------- Rail ---------- */
+    .rail {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      z-index: 20;
+      max-height: 100dvh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: var(--s-4) var(--s-3);
+      border-radius: 0;
+      border-width: 0 1px 0 0;
+    }
+
+    .rail::-webkit-scrollbar {
+      display: none;
+    }
+
+    .rail-brand {
+      display: flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: var(--s-1) var(--s-2) var(--s-5);
+    }
+
+    .rail-logo {
+      width: 26px;
+      height: 26px;
+      flex: 0 0 26px;
+    }
+
+    .rail-wordmark {
+      font-size: var(--fs-sm);
+      font-weight: 600;
+      letter-spacing: var(--ls-tight);
+      white-space: nowrap;
+    }
+
+    .rail-wordmark span {
+      color: var(--accent-orange);
+    }
+
+    .rail-group {
+      margin: var(--s-4) var(--s-2) var(--s-1);
+      font-size: var(--fs-micro);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: var(--ls-caps);
+      color: var(--text-muted);
+    }
+
+    .rail-group:first-of-type {
+      margin-top: 0;
+    }
+
+    .rail .rail-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: var(--s-3);
+      width: 100%;
+      padding: 9px var(--s-3);
+      border: 1px solid transparent;
+      border-radius: var(--r-sm);
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: var(--fs-base);
+      font-weight: 500;
+      text-align: left;
+      white-space: nowrap;
+      cursor: pointer;
+      box-shadow: none;
+      transition: color var(--dur-fast) ease,
+                  background var(--dur-fast) ease,
+                  border-color var(--dur-fast) ease;
+    }
+
+    .rail .rail-item:hover {
+      color: var(--text-primary);
+      background: var(--glass-inner);
+    }
+
+    .rail .rail-item.active {
+      color: var(--accent-orange);
+      background: var(--accent-dim);
+      border-color: rgba(var(--accent-rgb), 0.28);
+    }
+
+    /* The active marker is a bar on the leading edge rather than a filled
+       pill, so it reads as a position in a list, not a second button. */
+    .rail .rail-item.active::before {
+      content: '';
+      position: absolute;
+      left: -1px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 2px;
+      height: 18px;
+      border-radius: 0 2px 2px 0;
+      background: var(--accent-orange);
+    }
+
+    .rail-ico {
+      width: 17px;
+      height: 17px;
+      flex: 0 0 17px;
+      fill: currentColor;
+    }
+
+    .rail-label {
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .rail-badge {
+      flex: 0 0 auto;
+      min-width: 18px;
+      padding: 1px 5px;
+      border-radius: var(--r-full);
+      background: rgba(var(--accent-rgb), 0.18);
+      color: var(--accent-orange);
+      font: 600 var(--fs-micro)/1.5 var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+    }
+
+    .rail-foot {
+      margin-top: auto;
+      padding-top: var(--s-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+    }
+
+    .rail-foot .status-indicator {
+      justify-content: flex-start;
+      width: 100%;
+      font-size: var(--fs-xs);
+    }
+
+    /* ---------- Workspace ---------- */
+    .workspace {
+      display: block;
+      min-width: 0;
+      max-width: 1400px;
+      padding: 0 var(--gutter) var(--s-12);
+    }
+
+    /* ---------- Topbar (still a <header>, so the glass recipe still matches) ---------- */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      min-height: var(--topbar-h);
+      margin: 0 calc(var(--gutter) * -1) var(--s-4);
+      padding: var(--s-2) var(--gutter);
+      border-radius: 0;
+      border-width: 0 0 1px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--s-3);
+    }
+
+    .topbar-spacer {
+      flex: 1 1 auto;
+    }
+
+    .chain-chip,
+    .wallet-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: 5px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--r-sm);
+      background: var(--bg-tertiary);
+      font-size: var(--fs-xs);
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .chain-chip #networkName {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      letter-spacing: var(--ls-caps);
+      text-transform: uppercase;
+      color: var(--text-primary);
+    }
+
+    .chain-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-orange);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .wallet-chip svg {
+      width: 13px;
+      height: 13px;
+      fill: currentColor;
+      opacity: 0.75;
+    }
+
+    .wallet-chip b {
+      font: 600 var(--fs-sm)/1 var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: var(--ls-num);
+      color: var(--text-primary);
+    }
+
+    /* ---------- Mine control: the app's primary verb, one click from anywhere ---------- */
+    .minebar {
+      position: relative;
+      display: inline-flex;
+      align-items: stretch;
+      overflow: hidden;
+      border: 1px solid rgba(var(--accent-rgb), 0.3);
+      border-radius: var(--r-sm);
+      background: rgba(var(--accent-rgb), 0.08);
+    }
+
+    .minebar-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      font-size: var(--fs-micro);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: var(--ls-caps);
+      color: var(--accent-orange);
+      border-right: 1px solid rgba(var(--accent-rgb), 0.24);
+      pointer-events: none;
+    }
+
+    .minebar-label svg {
+      width: 13px;
+      height: 13px;
+      fill: currentColor;
+    }
+
+    .mine-seg {
+      min-width: 38px;
+      padding: 7px 10px;
+      border: none;
+      border-right: 1px solid rgba(var(--accent-rgb), 0.18);
+      background: transparent;
+      color: var(--text-primary);
+      font: 600 var(--fs-sm)/1 var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      cursor: pointer;
+      transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
+    }
+
+    .mine-seg:last-child {
+      border-right: none;
+    }
+
+    .mine-seg:hover {
+      background: rgba(var(--accent-rgb), 0.2);
+      color: var(--accent-orange);
+    }
+
+    .mine-seg:active {
+      background: rgba(var(--accent-rgb), 0.32);
+    }
+
+    /* A sweep that runs only while a mine request is actually open */
+    .minebar.is-mining::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(100deg, transparent 30%,
+                  rgba(var(--accent-rgb), 0.35) 50%, transparent 70%);
+      animation: mine-sweep var(--dur-xslow) linear infinite;
+    }
+
+    /* Drawn once when the chain is empty, to point at the thing to press */
+    .minebar.is-hinted {
+      box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.5);
+    }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 1px solid var(--border-color);
+      border-radius: var(--r-sm);
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+    }
+
+    .icon-btn:hover {
+      color: var(--accent-orange);
+      border-color: rgba(var(--accent-rgb), 0.4);
+    }
+
+    .icon-btn svg {
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
+    }
+
+    .icon-btn.settings-btn {
+      width: 32px;
+      height: 32px;
+    }
+
+    .icon-btn.settings-btn svg {
+      fill: none;
+      stroke: currentColor;
+    }
+
+    /* ============================================================
+       Chainflow.
+
+       Left: the mempool as a candidate block the exact footprint of the
+       block it becomes. Middle: a "now" divider. Right: confirmed blocks
+       marching away from the tip, newest against the divider.
+       ============================================================ */
+    .chainflow {
+      display: grid;
+      grid-template-columns: minmax(0, auto) 26px minmax(0, 1fr);
+      grid-template-areas:
+        "pool div lane"
+        "meta meta meta";
+      gap: var(--s-3) var(--s-4);
+      padding: var(--s-4);
+      margin-bottom: var(--s-6);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--r-lg);
+      box-shadow: var(--e-1);
+    }
+
+    .cf-micro {
+      font-size: var(--fs-micro);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: var(--ls-caps);
+      color: var(--text-muted);
+    }
+
+    .cf-pool {
+      grid-area: pool;
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+    }
+
+    .cf-pool-head,
+    .cf-lane-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--s-3);
+      min-height: 16px;
+    }
+
+    .cf-pool-count,
+    .cf-tip {
+      font-size: var(--fs-micro);
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .cf-pool-count b,
+    .cf-tip b {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: var(--ls-num);
+      color: var(--text-primary);
+    }
+
+    .cf-tip b {
+      font-size: var(--fs-md);
+      font-weight: 600;
+      color: var(--accent-orange);
+    }
+
+    /* The candidate is the same footprint as a .cf-block on purpose: the eye
+       reads it as the slot the next block comes out of. */
+    .cf-candidate {
+      position: relative;
+      width: var(--cf-w);
+      height: var(--cf-h);
+      margin-top: var(--cf-depth);
+      padding: var(--s-2);
+      border: 1px dashed var(--cf-empty);
+      border-radius: var(--r-xs);
+      display: flex;
+      flex-wrap: wrap;
+      align-content: center;
+      justify-content: center;
+      gap: 3px;
+    }
+
+    .cf-chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-content: center;
+      justify-content: center;
+      gap: 3px;
+    }
+
+    .cf-candidate-empty {
+      font-size: var(--fs-micro);
+      line-height: 1.3;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: var(--ls-caps);
+      color: var(--text-muted);
+    }
+
+    .chainflow[data-pool="empty"] .cf-chips {
+      display: none;
+    }
+
+    .chainflow[data-pool="has"] .cf-candidate-empty {
+      display: none;
+    }
+
+    .chainflow[data-pool="has"] .cf-candidate {
+      border-style: solid;
+      border-color: rgba(var(--accent-rgb), 0.45);
+      background: rgba(var(--accent-rgb), 0.06);
+    }
+
+    .cf-chip {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      background: rgba(var(--accent-rgb), 0.85);
+    }
+
+    .cf-chip[data-rate="high"] { background: var(--accent-green); }
+    .cf-chip[data-rate="low"]  { background: rgba(var(--accent-rgb), 0.4); }
+
+    .cf-chip.is-entering { animation: cf-chip-in var(--dur-med) var(--ease-spring); }
+    .cf-chip.is-flying   { animation: cf-chip-fly 240ms var(--ease-standard) forwards; }
+
+    .cf-pool-sub {
+      font-size: var(--fs-micro);
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .cf-divider {
+      grid-area: div;
+      position: relative;
+      display: flex;
+      justify-content: center;
+    }
+
+    .cf-divider::before {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      width: 1px;
+      background: linear-gradient(to bottom, transparent,
+                  rgba(var(--accent-rgb), 0.55), transparent);
+    }
+
+    .cf-divider-cap {
+      position: absolute;
+      top: 50%;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent-orange);
+      opacity: 0;
+    }
+
+    .cf-divider-cap.is-firing { animation: cf-pulse 380ms var(--ease-standard); }
+
+    .cf-lane {
+      grid-area: lane;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+    }
+
+    .cf-viewport {
+      position: relative;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      overflow-anchor: none;
+      scrollbar-width: none;
+      -webkit-mask-image: linear-gradient(to right, #000 84%, transparent 100%);
+              mask-image: linear-gradient(to right, #000 84%, transparent 100%);
+    }
+
+    .cf-viewport::-webkit-scrollbar {
+      display: none;
+    }
+
+    .cf-fade {
+      display: none;
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 56px;
+      pointer-events: none;
+      background: linear-gradient(to right, transparent, rgb(var(--card-rgb)));
+    }
+
+    @supports not ((mask-image: linear-gradient(#000, #000)) or (-webkit-mask-image: linear-gradient(#000, #000))) {
+      .cf-viewport { -webkit-mask-image: none; mask-image: none; }
+      .cf-fade { display: block; }
+    }
+
+    .cf-track {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--cf-gap);
+      padding-top: var(--cf-depth);
+      transform: translate3d(var(--cf-shift, 0px), 0, 0);
+    }
+
+    .cf-track.is-priming  { transition: none; }
+    .cf-track.is-shifting {
+      transition: transform var(--cf-dur, 520ms) var(--ease-spring);
+      will-change: transform;
+    }
+
+    /* ---------- The cube ----------
+       Two skewed pseudo-elements, no perspective and no rotate3d. Note there
+       is deliberately no `contain` here: contain: paint clips to the padding
+       box and both faces sit outside it, which erases the extrusion. */
+    .cf-block {
+      position: relative;
+      flex: 0 0 var(--cf-w);
+      width: var(--cf-w);
+      height: var(--cf-h);
+      margin-top: var(--cf-depth);
+      margin-right: var(--cf-depth);
+      padding: 0;
+      border-radius: var(--r-xs);
+      cursor: pointer;
+      background: linear-gradient(165deg,
+        rgba(var(--accent-rgb), calc(0.14 + var(--cf-fill, 0) * 0.32)),
+        rgba(var(--accent-rgb), calc(0.04 + var(--cf-fill, 0) * 0.14)) 62%,
+        var(--bg-tertiary));
+      border: 1px solid rgba(var(--accent-rgb), calc(0.2 + var(--cf-fill, 0) * 0.4));
+      box-shadow: var(--e-1);
+      transition: transform var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard);
+    }
+
+    .cf-block::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(var(--cf-depth) * -1);
+      height: var(--cf-depth);
+      background: linear-gradient(to bottom,
+        rgba(var(--accent-rgb), calc(0.32 + var(--cf-fill, 0) * 0.4)),
+        rgba(var(--accent-rgb), calc(0.16 + var(--cf-fill, 0) * 0.24)));
+      transform: skewX(-45deg);
+      transform-origin: bottom left;
+      border-radius: var(--r-xs) var(--r-xs) 0 0;
+    }
+
+    .cf-block::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: calc(var(--cf-depth) * -1);
+      width: var(--cf-depth);
+      background: linear-gradient(to right, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.42));
+      transform: skewY(-45deg);
+      transform-origin: top left;
+      border-radius: 0 var(--r-xs) var(--r-xs) 0;
+    }
+
+    :root[data-theme="light"] .cf-block::after {
+      background: linear-gradient(to right, rgba(20, 30, 60, 0.14), rgba(20, 30, 60, 0.24));
+    }
+
+    .cf-block:hover { transform: translateY(-2px); }
+
+    .cf-block:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.85);
+    }
+
+    .cf-block.is-tip { box-shadow: var(--e-1), var(--e-accent); }
+
+    .cf-block.is-new { animation: cf-block-in var(--dur-slow) var(--ease-spring) backwards; }
+
+    /* The common regtest case has to read as deliberately, visibly empty */
+    .cf-block[data-empty="true"] {
+      --cf-fill: 0;
+      background: var(--bg-tertiary);
+      border-style: dashed;
+      border-color: var(--cf-empty);
+    }
+
+    .cf-block[data-empty="true"]::before { opacity: 0.5; }
+
+    .cf-block[data-skeleton="true"] .cf-tx,
+    .cf-block[data-skeleton="true"] .cf-sz { opacity: 0.3; }
+
+    .cf-block.is-orphaned {
+      border-color: var(--accent-red);
+      border-style: solid;
+    }
+
+    .cf-block.is-orphaned .cf-h { text-decoration: line-through; color: var(--accent-red); }
+
+    .cf-face {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      height: 100%;
+      padding: var(--s-1);
+    }
+
+    .cf-h {
+      font: 600 var(--fs-hero)/1.1 var(--font-mono);
+      letter-spacing: var(--ls-num);
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+    }
+
+    .cf-tx,
+    .cf-sz {
+      font-size: var(--fs-micro);
+      line-height: 1.25;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .cf-age {
+      display: block;
+      text-align: center;
+      margin-top: var(--s-1);
+      font: 500 var(--fs-micro)/1 var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    /* One square per transaction. Countable at a glance, and honest about a
+       chain where most blocks hold nothing but their coinbase. */
+    .cf-pips {
+      display: grid;
+      grid-template-columns: repeat(4, 5px);
+      gap: 2px;
+      min-height: 5px;
+    }
+
+    .cf-pip {
+      width: 5px;
+      height: 5px;
+      border-radius: 1px;
+      background: rgba(var(--accent-rgb), 0.85);
+    }
+
+    .cf-pip--coinbase { background: var(--accent-yellow); }
+
+    .cf-bar {
+      display: none;
+      width: 30px;
+      height: 5px;
+      border-radius: 2px;
+      overflow: hidden;
+      background: rgba(var(--text-rgb), 0.12);
+    }
+
+    .cf-bar > i {
+      display: block;
+      height: 100%;
+      background: var(--accent-orange);
+      transform: scaleX(var(--cf-fill, 0));
+      transform-origin: left center;
+      transition: transform var(--dur-med) var(--ease-out-expo);
+    }
+
+    .cf-block[data-dense="true"] .cf-pips { display: none; }
+    .cf-block[data-dense="true"] .cf-bar  { display: block; }
+
+    .cf-meta {
+      grid-area: meta;
+      display: flex;
+      align-items: center;
+      gap: var(--s-3);
+      flex-wrap: wrap;
+      padding-top: var(--s-2);
+      border-top: 1px solid var(--hairline);
+      font-size: var(--fs-micro);
+      color: var(--text-muted);
+    }
+
+    .cf-legend {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .cf-legend .cf-pip { margin-left: var(--s-2); }
+    .cf-legend .cf-pip:first-child { margin-left: 0; }
+
+    .cf-pill {
+      padding: 2px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--r-full);
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: var(--fs-micro);
+    }
+
+    .cf-pill--event {
+      cursor: pointer;
+      border-color: rgba(var(--accent-rgb), 0.4);
+      color: var(--accent-orange);
+    }
+
+    .cf-pill--event[data-kind="error"] {
+      border-color: rgba(var(--red-rgb), 0.5);
+      color: var(--accent-red);
+    }
+
+    .cf-meta-age { font-family: var(--font-mono); }
+
+    /* A tip readout that ticks when the height changes */
+    .is-ticking { animation: cf-tick var(--dur-med) var(--ease-standard); }
+
+    /* Non-regtest chains cannot be mined from here, so the candidate block
+       stops advertising a "next block" it will never produce. */
+    .chainflow:not([data-chain="regtest"]) .cf-pool-sub { visibility: hidden; }
+
+    @keyframes cf-block-in {
+      from { opacity: 0; transform: translateX(-14px) scale(0.88); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    @keyframes cf-chip-in {
+      from { opacity: 0; transform: scale(0.4) translateY(8px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    @keyframes cf-chip-fly {
+      from { opacity: 1; transform: none; }
+      to   { opacity: 0; transform: translateX(var(--cf-fly, 60px)) scale(0.35); }
+    }
+
+    @keyframes cf-pulse {
+      from { opacity: 0.9; transform: scaleX(1); }
+      to   { opacity: 0; transform: scaleX(7); }
+    }
+
+    @keyframes cf-tick {
+      0%   { transform: translateY(0); }
+      40%  { transform: translateY(-5px); opacity: 0.35; }
+      41%  { transform: translateY(5px); }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes mine-sweep {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(100%); }
+    }
+
+    /* Rail collapses to icons before the workspace has to give anything up.
+       Must come BEFORE the 768px block, which un-hides the labels again. */
+    @media (max-width: 1180px) {
+      .app { grid-template-columns: var(--rail-w-collapsed) minmax(0, 1fr); }
+
+      .rail { padding: var(--s-4) var(--s-2); align-items: stretch; }
+
+      .rail .rail-item { justify-content: center; padding: 9px 0; }
+
+      /* Clipped rather than removed: the accessible name survives, and every
+         item carries a title= for sighted users. */
+      .rail-label,
+      .rail-group,
+      .rail-wordmark {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      .rail-brand { justify-content: center; padding-inline: 0; }
+
+      .rail-badge {
+        position: absolute;
+        top: 3px;
+        right: 8px;
+        min-width: 0;
+        padding: 0 4px;
+      }
+
+      .rail-foot .status-indicator { justify-content: center; padding: 6px; }
+      .rail-foot .status-indicator span { display: none; }
+
+      .chainflow { --cf-w: 94px; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .ambient::before,
       .status-dot.connected {
@@ -1284,6 +2119,8 @@
       }
     }
 
+    /* One breakpoint for the narrow case. It has to come AFTER the 1180px
+       block, which hides the rail labels: this one brings them back. */
     @media (max-width: 768px) {
       .grid-2 {
         grid-template-columns: 1fr;
@@ -1297,9 +2134,68 @@
       .theme-panel {
         width: 100%;
       }
+      /* flex-start, not center: the topbar has six children now and
+         centering collapses them into each other. */
       header {
-        justify-content: center;
+        justify-content: flex-start;
       }
+
+      .app { grid-template-columns: 1fr; }
+
+      .rail {
+        position: static;
+        max-height: none;
+        flex-direction: row;
+        align-items: center;
+        overflow-x: auto;
+        border-width: 0 0 1px;
+        padding: var(--s-2) var(--s-3);
+      }
+
+      .rail .rail-item {
+        width: auto;
+        flex: 0 0 auto;
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px 10px;
+      }
+
+      .rail .rail-item.active::before { display: none; }
+
+      /* Un-hide what the 1180px block clipped */
+      .rail-label {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip-path: none;
+        font-size: var(--fs-micro);
+      }
+
+      .rail-group,
+      .rail-brand,
+      .rail-foot { display: none; }
+
+      .rail-badge { position: static; }
+
+      .workspace { padding-inline: var(--s-4); }
+
+      .chainflow {
+        --cf-w: 72px;
+        --cf-depth: 8px;
+        --cf-gap: 10px;
+        grid-template-columns: auto 18px minmax(0, 1fr);
+        padding: var(--s-3);
+      }
+
+      .cf-sz { display: none; }
+      .cf-meta { font-size: 10px; }
+    }
+
+    /* A laptop in a video call should not lose the panels below the fold. */
+    @media (max-height: 640px) {
+      .cf-age { display: none; }
+      .chainflow .cf-meta { display: none; }
     }
 
     /* Log viewer. .result-box breaks on any character, which shreds log lines,
@@ -1364,23 +2260,28 @@
     .api-deprecated { text-decoration: line-through; opacity: 0.6; }
   </style>
   <script>
-    // Glass is off on a first visit (the attribute on <html> is the default) and
-    // only switches on for someone who has previously turned it on. Applying the
-    // saved choice here, before the first paint, keeps the effect from flashing
-    // in and out on every load.
+    // Glass is on by default now, so this guard downgrades rather than
+    // upgrades: someone who deliberately turned it off keeps it off, and
+    // someone who never touched the switch gets the shipped look. Still one
+    // synchronous read before the first paint, so nothing flashes.
     try {
-      if (localStorage.getItem('dashboardGlass') === 'on') {
-        document.documentElement.setAttribute('data-glass', 'on');
+      if (localStorage.getItem('dashboardGlass') === 'off') {
+        document.documentElement.setAttribute('data-glass', 'off');
       }
     } catch (e) { /* storage unavailable, keep the default */ }
   </script>
 </head>
 <body>
   <div class="ambient"></div>
-  <div class="container">
-    <header>
-      <div class="logo">
-        <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" style="width: 40px; height: 40px;">
+  <div class="app">
+    <a class="skip-link" href="#chainflow">Skip to content</a>
+
+    <!-- ================= Rail =================
+         Every item keeps class="tab" + data-tab, so the switcher, the log
+         stream hook and the API lazy-load all keep working untouched. -->
+    <nav class="rail" aria-label="Sections">
+      <div class="rail-brand">
+        <svg class="rail-logo" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <defs>
             <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" style="stop-color:#5AC8FA"/>
@@ -1390,9 +2291,27 @@
           <rect width="256" height="256" rx="56" fill="url(#logoGradient)"/>
           <path fill="#FFFFFF" transform="scale(4)" d="M46.1 27.4c.6-4.1-2.5-6.3-6.8-7.8l1.4-5.6-3.4-.8-1.4 5.4c-.9-.2-1.8-.4-2.7-.7l1.4-5.5-3.4-.8-1.4 5.6c-.7-.2-1.5-.4-2.2-.5v0l-4.7-1.2-.9 3.6s2.5.6 2.5.6c1.4.3 1.6 1.2 1.6 1.9l-1.6 6.4c.1 0 .2.1.3.1-.1 0-.2-.1-.3-.1l-2.2 9c-.2.4-.6 1.1-1.6.8 0 0-2.5-.6-2.5-.6l-1.7 3.9 4.4 1.1c.8.2 1.6.4 2.4.6l-1.4 5.7 3.4.8 1.4-5.6c.9.3 1.8.5 2.7.7l-1.4 5.6 3.4.8 1.4-5.7c5.8 1.1 10.2.7 12-4.6 1.5-4.3-.1-6.7-3.1-8.3 2.2-.5 3.9-2 4.3-5zm-7.7 10.8c-1.1 4.3-8.3 2-10.6 1.4l1.9-7.6c2.4.6 9.8 1.8 8.7 6.2zm1.1-10.9c-1 3.9-7 1.9-8.9 1.4l1.7-6.9c2 .5 8.2 1.4 7.2 5.5z"/>
         </svg>
-        <h1>Regtest <span>Dashboard</span></h1>
+        <span class="rail-wordmark">Regtest <span>Dashboard</span></span>
       </div>
-      <div style="display: flex; align-items: center; gap: 12px;">
+
+      <p class="rail-group">Operate</p>
+      <button class="rail-item tab active" data-tab="mining" title="Mining"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span class="rail-label">Mining</span></button>
+      <button class="rail-item tab" data-tab="wallet" title="Wallet"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10v-6H12v6zm3-1.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg><span class="rail-label">Wallet</span></button>
+      <button class="rail-item tab" data-tab="transactions" title="Transactions"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 3 3 7.5 7.5 12V9H18V6H7.5V3zM16.5 12 21 16.5 16.5 21v-3H6v-3h10.5v-3z"/></svg><span class="rail-label">Transactions</span></button>
+
+      <p class="rail-group">Observe</p>
+      <button class="rail-item tab" data-tab="blocks" title="Blocks"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5zm0 2.3L18.6 8 12 11.7 5.4 8 12 4.3zM5 9.7l6 3.4v6.6l-6-3.3V9.7zm8 10v-6.6l6-3.4v6.7l-6 3.3z"/></svg><span class="rail-label">Blocks</span></button>
+      <button class="rail-item tab" data-tab="mempool" title="Mempool"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4V5zm0 4h16v2H4V9zm0 4h16v2H4v-2zm0 4h10v2H4v-2z"/></svg><span class="rail-label">Mempool</span><span class="rail-badge" id="railMempoolBadge" hidden>0</span></button>
+      <button class="rail-item tab" data-tab="explorer" title="Explorer"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg><span class="rail-label">Explorer</span></button>
+
+      <p class="rail-group">Develop</p>
+      <button class="rail-item tab" data-tab="electrs" title="Electrs"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.93 6h-2.95a15.65 15.65 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.93 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14A7.82 7.82 0 0 1 4 12c0-.69.1-1.36.26-2h3.38a16.5 16.5 0 0 0 0 4H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.99 7.99 0 0 1 5.08 16zm2.95-8H5.08a7.99 7.99 0 0 1 4.33-3.56A15.65 15.65 0 0 0 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66a14.7 14.7 0 0 1 0-4h4.68a14.7 14.7 0 0 1 0 4zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a7.99 7.99 0 0 1-4.33 3.56zM16.36 14a16.5 16.5 0 0 0 0-4h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg><span class="rail-label">Electrs</span></button>
+      <button class="rail-item tab" data-tab="raw" title="Raw TX"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.4 16.6 4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0 4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg><span class="rail-label">Raw TX</span></button>
+      <button class="rail-item tab" data-tab="rpc" title="RPC Console"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 14H4V8h16v10zM6 10.5 7.5 9 11 12.5 7.5 16 6 14.5l2-2-2-2zM12.5 14H18v2h-5.5v-2z"/></svg><span class="rail-label">RPC Console</span></button>
+      <button class="rail-item tab" data-tab="logs" title="Logs"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 12h8v2H8v-2zm0 4h8v2H8v-2z"/></svg><span class="rail-label">Logs</span></button>
+      <button class="rail-item tab" data-tab="api" title="API"><svg class="rail-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.9 12a3.1 3.1 0 0 1 3.1-3.1h4V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12zM8 13h8v-2H8v2zm9-6h-4v1.9h4a3.1 3.1 0 0 1 0 6.2h-4V17h4a5 5 0 0 0 0-10z"/></svg><span class="rail-label">API</span></button>
+
+      <div class="rail-foot">
         <div class="status-indicator" title="Bitcoin Core">
           <div class="status-dot" id="statusDot"></div>
           <span id="statusText">Connecting...</span>
@@ -1401,157 +2320,104 @@
           <div class="status-dot" id="electrsStatusDot"></div>
           <span id="electrsStatusText">Electrs...</span>
         </div>
-        <button class="settings-btn" onclick="toggleThemePanel()" title="Theme Settings">
+      </div>
+    </nav>
+
+    <div class="workspace">
+      <!-- Still a <header>, so the glass recipe and its @supports fallback
+           keep matching without needing a second selector. -->
+      <header class="topbar">
+        <span class="chain-chip" title="Chain"><i class="chain-dot" aria-hidden="true"></i><span id="networkName">regtest</span></span>
+
+        <!-- regtest-only sits on the wrapper only: .disabled sets
+             pointer-events:none, which already covers the segments. -->
+        <div class="minebar regtest-only" id="mineBar" role="group" aria-label="Mine blocks">
+          <span class="minebar-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>Mine</span>
+          <button class="mine-seg" id="mine1Btn" onclick="mineBlocks(1)" title="Mine 1 block">1</button>
+          <button class="mine-seg" id="mine10Btn" onclick="mineBlocks(10)" title="Mine 10 blocks">10</button>
+          <button class="mine-seg" id="mine100Btn" onclick="mineBlocks(100)" title="Mine 100 blocks">100</button>
+        </div>
+
+        <span class="topbar-spacer"></span>
+
+        <span class="wallet-chip" title="Confirmed wallet balance">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10v-6H12v6zm3-1.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>
+          <b id="walletBalance">-</b>
+        </span>
+
+        <button class="icon-btn" onclick="generateNewAddress()" title="New address">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </button>
+        <button class="icon-btn" onclick="refreshAll()" title="Refresh everything">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        </button>
+        <button class="icon-btn settings-btn" onclick="toggleThemePanel()" title="Theme Settings">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
           </svg>
         </button>
+      </header>
+
+      <!-- Network warning banner. Id, class and contents unchanged; only re-parented. -->
+      <div class="network-warning" id="networkWarning">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <span id="networkWarningText">Connected to mainnet. Mining and regtest-specific features are disabled.</span>
       </div>
-    </header>
 
-    <!-- Theme Panel -->
-    <div class="theme-panel-overlay" id="themePanelOverlay" onclick="toggleThemePanel()"></div>
-    <div class="theme-panel" id="themePanel">
-      <h3>
-        Theme Settings
-        <button class="close-btn" onclick="toggleThemePanel()">&times;</button>
-      </h3>
-
-      <div class="switch-row">
-        <div>
-          <span class="switch-label">Glass Effect</span>
-          <span class="switch-hint">Frosted cards, glow and wallpaper</span>
+      <!-- ================= Chainflow =================
+           The mempool on the left, drawn as the block it is about to become;
+           a "now" divider; then confirmed blocks marching away from the tip. -->
+      <section class="chainflow" id="chainflow" data-state="idle" data-pool="empty"
+               data-chain="regtest" aria-label="Chain activity">
+        <div class="cf-pool">
+          <div class="cf-pool-head">
+            <span class="cf-micro">Mempool</span>
+            <span class="cf-pool-count"><b id="mempoolSize">0</b> tx</span>
+          </div>
+          <div class="cf-candidate" id="cfCandidate">
+            <div class="cf-chips" id="cfChips"></div>
+            <span class="cf-candidate-empty">no pending txs</span>
+          </div>
+          <div class="cf-pool-sub" id="cfPoolSub">next block &middot; empty</div>
         </div>
-        <button type="button" class="switch" id="glassToggle" role="switch"
-                aria-checked="false" aria-label="Glass Effect" onclick="toggleGlass()"></button>
-      </div>
 
-      <div class="theme-presets">
-        <label>Dark Themes</label>
-        <div class="preset-grid">
-          <button class="preset-btn" style="background: #f7931a;" onclick="applyPreset('bitcoin')" title="Bitcoin Orange"></button>
-          <button class="preset-btn" style="background: #22c55e;" onclick="applyPreset('green')" title="Green"></button>
-          <button class="preset-btn" style="background: #3b82f6;" onclick="applyPreset('blue')" title="Blue"></button>
-          <button class="preset-btn" style="background: #a855f7;" onclick="applyPreset('purple')" title="Purple"></button>
-          <button class="preset-btn" style="background: #ef4444;" onclick="applyPreset('red')" title="Red"></button>
-          <button class="preset-btn" style="background: #ec4899;" onclick="applyPreset('pink')" title="Pink"></button>
-          <button class="preset-btn" style="background: #14b8a6;" onclick="applyPreset('teal')" title="Teal"></button>
-          <button class="preset-btn" style="background: #eab308;" onclick="applyPreset('yellow')" title="Yellow"></button>
+        <div class="cf-divider" aria-hidden="true"><span class="cf-divider-cap" id="cfDividerCap"></span></div>
+
+        <div class="cf-lane">
+          <div class="cf-lane-head">
+            <span class="cf-micro">Chain</span>
+            <span class="cf-tip">tip <b id="blockHeight">-</b></span>
+          </div>
+          <div class="cf-viewport" id="cfViewport">
+            <div class="cf-track" id="cfTrack"></div>
+            <div class="cf-fade" aria-hidden="true"></div>
+          </div>
         </div>
-      </div>
 
-      <div class="theme-presets">
-        <label>Light Themes</label>
-        <div class="preset-grid">
-          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #3b82f6 50%);" onclick="applyPreset('lightBlue')" title="Light Blue"></button>
-          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #22c55e 50%);" onclick="applyPreset('lightGreen')" title="Light Green"></button>
-          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #a855f7 50%);" onclick="applyPreset('lightPurple')" title="Light Purple"></button>
-          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #f7931a 50%);" onclick="applyPreset('lightOrange')" title="Light Orange"></button>
-          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #64748b 50%);" onclick="applyPreset('lightGray')" title="Light Gray"></button>
-          <button class="preset-btn" style="background: linear-gradient(135deg, #f8fafc 50%, #14b8a6 50%);" onclick="applyPreset('lightTeal')" title="Light Teal"></button>
+        <div class="cf-meta">
+          <span class="cf-legend"><i class="cf-pip cf-pip--coinbase"></i> coinbase <i class="cf-pip"></i> tx</span>
+          <span class="cf-meta-age" id="cfTipAge">-</span>
+          <span class="cf-pill" id="cfAutoPill" hidden>auto-mining</span>
+          <button class="cf-pill cf-pill--event" id="cfEvent" type="button" hidden></button>
         </div>
-      </div>
+      </section>
 
-      <div class="color-option">
-        <label>Accent Color</label>
-        <div class="color-picker-wrapper">
-          <input type="color" id="accentColor" value="#3b82f6" onchange="updateColor('accent', this.value)">
-          <input type="text" id="accentColorText" value="#3b82f6" onchange="updateColorFromText('accent', this.value)">
-        </div>
-      </div>
+      <!-- One block, cloned per height; the subtree is never re-parsed. -->
+      <template id="cfBlockTpl">
+        <button class="cf-block" type="button">
+          <span class="cf-face">
+            <span class="cf-pips" aria-hidden="true"></span>
+            <span class="cf-bar" aria-hidden="true"><i></i></span>
+            <b class="cf-h">#0</b>
+            <span class="cf-tx">-</span>
+            <span class="cf-sz">-</span>
+          </span>
+          <span class="cf-age">-</span>
+        </button>
+      </template>
 
-      <div class="color-option">
-        <label>Background</label>
-        <div class="color-picker-wrapper">
-          <input type="color" id="bgColor" value="#0a0f17" onchange="updateColor('bg', this.value)">
-          <input type="text" id="bgColorText" value="#0a0f17" onchange="updateColorFromText('bg', this.value)">
-        </div>
-      </div>
-
-      <div class="color-option">
-        <label>Card Background</label>
-        <div class="color-picker-wrapper">
-          <input type="color" id="cardColor" value="#111827" onchange="updateColor('card', this.value)">
-          <input type="text" id="cardColorText" value="#111827" onchange="updateColorFromText('card', this.value)">
-        </div>
-      </div>
-
-      <div class="color-option">
-        <label>Text Color</label>
-        <div class="color-picker-wrapper">
-          <input type="color" id="textColor" value="#f0f6fc" onchange="updateColor('text', this.value)">
-          <input type="text" id="textColorText" value="#f0f6fc" onchange="updateColorFromText('text', this.value)">
-        </div>
-      </div>
-
-      <div class="theme-actions">
-        <button class="btn btn-secondary" id="themeResetBtn" onclick="resetTheme()">Reset</button>
-        <button class="btn btn-primary" id="themeDoneBtn" onclick="toggleThemePanel()">Done</button>
-      </div>
-    </div>
-
-    <div class="stats-grid">
-      <div class="stat-card">
-        <h3>Block Height</h3>
-        <div class="value" id="blockHeight">-</div>
-      </div>
-      <div class="stat-card">
-        <h3>Balance</h3>
-        <div class="value" id="walletBalance">-</div>
-      </div>
-      <div class="stat-card">
-        <h3>Mempool Size</h3>
-        <div class="value" id="mempoolSize">-</div>
-      </div>
-      <div class="stat-card">
-        <h3>Network</h3>
-        <div class="value" id="networkName">regtest</div>
-      </div>
-    </div>
-
-    <!-- Network Warning Banner -->
-    <div class="network-warning" id="networkWarning">
-      <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-      <span id="networkWarningText">Connected to mainnet. Mining and regtest-specific features are disabled.</span>
-    </div>
-
-    <div class="quick-actions">
-      <button class="quick-action-btn regtest-only" id="mine1Btn" onclick="mineBlocks(1)">
-        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        Mine 1 Block
-      </button>
-      <button class="quick-action-btn regtest-only" id="mine10Btn" onclick="mineBlocks(10)">
-        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        Mine 10 Blocks
-      </button>
-      <button class="quick-action-btn regtest-only" id="mine100Btn" onclick="mineBlocks(100)">
-        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        Mine 100 Blocks
-      </button>
-      <button class="quick-action-btn" onclick="generateNewAddress()">
-        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        New Address
-      </button>
-      <button class="quick-action-btn" onclick="refreshAll()">
-        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-        Refresh
-      </button>
-    </div>
-
-    <div class="tabs">
-      <button class="tab active" data-tab="mining">Mining</button>
-      <button class="tab" data-tab="wallet">Wallet</button>
-      <button class="tab" data-tab="transactions">Transactions</button>
-      <button class="tab" data-tab="mempool">Mempool</button>
-      <button class="tab" data-tab="blocks">Blocks</button>
-      <button class="tab" data-tab="explorer">Explorer</button>
-      <button class="tab" data-tab="electrs">Electrs</button>
-      <button class="tab" data-tab="raw">Raw TX</button>
-      <button class="tab" data-tab="rpc">RPC Console</button>
-      <button class="tab" data-tab="logs">Logs</button>
-      <button class="tab" data-tab="api">API</button>
-    </div>
+      <div class="panels">
 
     <!-- Mining Tab -->
     <div class="tab-content active" id="tab-mining">
@@ -1730,6 +2596,7 @@
           </div>
           <button class="btn btn-primary" onclick="lookupBlock()">Lookup</button>
         </div>
+        <div id="blockLookupSummary" style="display:none; margin-top: 16px;"></div>
         <div id="blockLookupResult" class="result-box" style="display:none;"></div>
       </div>
 
@@ -2092,7 +2959,90 @@
         <div id="apiEndpointList"><div class="empty-state">Loading...</div></div>
       </div>
     </div>
-  </div>
+      </div><!-- /.panels -->
+    </div><!-- /.workspace -->
+  </div><!-- /.app -->
+
+    <!-- Theme Panel -->
+    <div class="theme-panel-overlay" id="themePanelOverlay" onclick="toggleThemePanel()"></div>
+    <div class="theme-panel" id="themePanel">
+      <h3>
+        Theme Settings
+        <button class="close-btn" onclick="toggleThemePanel()">&times;</button>
+      </h3>
+
+      <div class="switch-row">
+        <div>
+          <span class="switch-label">Glass Effect</span>
+          <span class="switch-hint">Ambient field, bloom and frosted chrome</span>
+        </div>
+        <button type="button" class="switch" id="glassToggle" role="switch"
+                aria-checked="false" aria-label="Glass Effect" onclick="toggleGlass()"></button>
+      </div>
+
+      <div class="theme-presets">
+        <label>Dark Themes</label>
+        <div class="preset-grid">
+          <button class="preset-btn" style="background: #f7931a;" onclick="applyPreset('bitcoin')" title="Bitcoin Orange"></button>
+          <button class="preset-btn" style="background: #4de3a0;" onclick="applyPreset('green')" title="Green"></button>
+          <button class="preset-btn" style="background: #3ecfff;" onclick="applyPreset('blue')" title="Blue"></button>
+          <button class="preset-btn" style="background: #a78bfa;" onclick="applyPreset('purple')" title="Purple"></button>
+          <button class="preset-btn" style="background: #ff7a6d;" onclick="applyPreset('red')" title="Red"></button>
+          <button class="preset-btn" style="background: #ff6ec7;" onclick="applyPreset('pink')" title="Pink"></button>
+          <button class="preset-btn" style="background: #2ee6c8;" onclick="applyPreset('teal')" title="Teal"></button>
+          <button class="preset-btn" style="background: #f5d90a;" onclick="applyPreset('yellow')" title="Yellow"></button>
+        </div>
+      </div>
+
+      <div class="theme-presets">
+        <label>Light Themes</label>
+        <div class="preset-grid">
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f4f6fb 50%, #0a6fbd 50%);" onclick="applyPreset('lightBlue')" title="Light Blue"></button>
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f4f6fb 50%, #0b7a44 50%);" onclick="applyPreset('lightGreen')" title="Light Green"></button>
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f4f6fb 50%, #6d3fd4 50%);" onclick="applyPreset('lightPurple')" title="Light Purple"></button>
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f4f6fb 50%, #a35a05 50%);" onclick="applyPreset('lightOrange')" title="Light Orange"></button>
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f4f6fb 50%, #4a5668 50%);" onclick="applyPreset('lightGray')" title="Light Gray"></button>
+          <button class="preset-btn" style="background: linear-gradient(135deg, #f4f6fb 50%, #0a7a75 50%);" onclick="applyPreset('lightTeal')" title="Light Teal"></button>
+        </div>
+      </div>
+
+      <div class="color-option">
+        <label>Accent Color</label>
+        <div class="color-picker-wrapper">
+          <input type="color" id="accentColor" value="#3ecfff" onchange="updateColor('accent', this.value)">
+          <input type="text" id="accentColorText" value="#3ecfff" onchange="updateColorFromText('accent', this.value)">
+        </div>
+      </div>
+
+      <div class="color-option">
+        <label>Background</label>
+        <div class="color-picker-wrapper">
+          <input type="color" id="bgColor" value="#080b14" onchange="updateColor('bg', this.value)">
+          <input type="text" id="bgColorText" value="#080b14" onchange="updateColorFromText('bg', this.value)">
+        </div>
+      </div>
+
+      <div class="color-option">
+        <label>Card Background</label>
+        <div class="color-picker-wrapper">
+          <input type="color" id="cardColor" value="#111725" onchange="updateColor('card', this.value)">
+          <input type="text" id="cardColorText" value="#111725" onchange="updateColorFromText('card', this.value)">
+        </div>
+      </div>
+
+      <div class="color-option">
+        <label>Text Color</label>
+        <div class="color-picker-wrapper">
+          <input type="color" id="textColor" value="#e6edf9" onchange="updateColor('text', this.value)">
+          <input type="text" id="textColorText" value="#e6edf9" onchange="updateColorFromText('text', this.value)">
+        </div>
+      </div>
+
+      <div class="theme-actions">
+        <button class="btn btn-secondary" id="themeResetBtn" onclick="resetTheme()">Reset</button>
+        <button class="btn btn-primary" id="themeDoneBtn" onclick="toggleThemePanel()">Done</button>
+      </div>
+    </div>
 
   <!-- Reset Confirmation Modal -->
   <div id="resetModal" class="modal-overlay">
@@ -2122,6 +3072,8 @@
     function updateNetworkUI(chain) {
       currentNetwork = chain;
       const isRegtest = chain === 'regtest';
+      const flow = document.getElementById('chainflow');
+      if (flow) flow.dataset.chain = chain;
       const regtestElements = document.querySelectorAll('.regtest-only');
       const warningBanner = document.getElementById('networkWarning');
       const warningText = document.getElementById('networkWarningText');
@@ -2146,14 +3098,41 @@
     // Tab switching
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => {
+          t.classList.remove('active');
+          t.removeAttribute('aria-current');
+        });
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         tab.classList.add('active');
+        tab.setAttribute('aria-current', 'page');
         document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
         // Only stream logs while the Logs tab is actually on screen.
         if (tab.dataset.tab === 'logs') { startLogStream(); loadDebugCategories(); } else stopLogStream();
         if (tab.dataset.tab === 'api') loadApiTab();
+        // replaceState does not fire hashchange, so this cannot loop.
+        if (location.hash.slice(1) !== tab.dataset.tab) {
+          history.replaceState(null, '', '#' + tab.dataset.tab);
+        }
       });
+    });
+
+    // Routing goes through the button's own click, so the log stream and the
+    // API lazy-load fire exactly as they do for a real click.
+    function selectTab(name) {
+      const btn = document.querySelector('.tab[data-tab="' + name + '"]');
+      if (!btn) return false;
+      btn.click();
+      return true;
+    }
+
+    window.addEventListener('hashchange', () => selectTab(location.hash.slice(1)));
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const panel = document.getElementById('themePanel');
+      if (panel && panel.classList.contains('open')) { toggleThemePanel(); return; }
+      const modal = document.getElementById('resetModal');
+      if (modal && modal.style.display === 'flex') hideResetModal();
     });
 
     // API helper
@@ -2331,7 +3310,12 @@
           api('/mempool/info')
         ]);
 
-        document.getElementById('blockHeight').textContent = blockchain.blocks.toLocaleString();
+        // Network first: .regtest-only gating and the ribbon's chain mode
+        // both read from it, and everything below is display only.
+        updateNetworkUI(blockchain.chain);
+
+        const heightEl = document.getElementById('blockHeight');
+        if (heightEl && cfTip === null) heightEl.textContent = blockchain.blocks.toLocaleString();
         // Format balance: show fewer decimals for large amounts
         const bal = balance.confirmed;
         let balanceText;
@@ -2342,12 +3326,16 @@
         } else {
           balanceText = bal.toFixed(8) + ' BTC';
         }
-        document.getElementById('walletBalance').textContent = balanceText;
-        document.getElementById('mempoolSize').textContent = mempool.size;
-        document.getElementById('networkName').textContent = blockchain.chain;
+        const balEl = document.getElementById('walletBalance');
+        if (balEl) balEl.textContent = balanceText;
+        const poolEl = document.getElementById('mempoolSize');
+        if (poolEl) poolEl.textContent = mempool.size;
+        const netEl = document.getElementById('networkName');
+        if (netEl) netEl.textContent = blockchain.chain;
 
-        // Update UI based on network type
-        updateNetworkUI(blockchain.chain);
+        // Both of these ride on responses we already have in hand.
+        cfSetMempool(mempool);
+        cfNoteBestHash(blockchain.blocks, blockchain.bestblockhash);
       } catch (error) {
         console.error('Failed to refresh stats:', error);
       }
@@ -2355,12 +3343,23 @@
 
     // Mine blocks
     async function mineBlocks(count, address = null) {
+      const bar = document.getElementById('mineBar');
+      if (bar) bar.classList.add('is-mining');
+      // Snapshotted before the request: the tip watcher can land these same
+      // blocks while the POST is still open, and adding to a moving cfTip
+      // would count them twice.
+      const tipBefore = cfTip;
       try {
         const result = await api('/mine', {
           method: 'POST',
           body: JSON.stringify({ blocks: count, address: address })
         });
         showResult('mineResult', result);
+        // The response already carries hashes[], so the ribbon moves with no
+        // extra request and no wait for the next poll.
+        cfOnMined(result, tipBefore);
+        const mined = (result.hashes && result.hashes.length) || count;
+        cfEvent('+' + mined + ' block' + (mined === 1 ? '' : 's'));
         refreshStats();
         loadMiningInfo();
         loadRecentBlocks();
@@ -2369,6 +3368,10 @@
         return result;
       } catch (error) {
         showResult('mineResult', error.message, true);
+        // #mineResult lives on the Mining panel; this is what the other ten see.
+        cfEvent(error.message, 'error');
+      } finally {
+        if (bar) bar.classList.remove('is-mining');
       }
     }
 
@@ -2441,6 +3444,9 @@
       const statusEl = document.getElementById('autoMineStatus');
       const startBtn = document.getElementById('autoMineStartBtn');
       const stopBtn = document.getElementById('autoMineStopBtn');
+
+      const autoPill = document.getElementById('cfAutoPill');
+      if (autoPill) autoPill.hidden = !(status && status.running);
 
       if (status && status.running) {
         startBtn.style.display = 'none';
@@ -2815,28 +3821,60 @@
         } else {
           result = await api('/block/' + input);
         }
+        // The same five facts the ribbon shows, so a block reads the same way
+        // wherever you meet it. The raw JSON still follows underneath.
+        const summary = document.getElementById('blockLookupSummary');
+        if (summary) {
+          summary.innerHTML = cfBlockSummaryHtml(result);
+          summary.style.display = '';
+        }
         showResult('blockLookupResult', result);
       } catch (error) {
+        const summary = document.getElementById('blockLookupSummary');
+        if (summary) summary.style.display = 'none';
         showResult('blockLookupResult', error.message, true);
       }
     }
 
-    // Load recent blocks
-    async function loadRecentBlocks() {
-      try {
-        const blockchain = await api('/blockchain/info');
-        const blocks = [];
+    function cfBlockSummaryHtml(b) {
+      if (!b || typeof b.height !== 'number') return '';
+      const tile = (label, value) =>
+        '<div class="stat-card"><h3>' + esc(label) + '</h3>' +
+        '<div class="value">' + esc(value) + '</div></div>';
+      return '<div class="stats-grid">' +
+        tile('Height', b.height.toLocaleString()) +
+        tile('Transactions', String(b.nTx != null ? b.nTx : '-')) +
+        tile('Size', fmtBytes(b.size)) +
+        tile('Weight', (b.weight != null ? b.weight.toLocaleString() + ' WU' : '-')) +
+        tile('Mined', (b.time ? timeAgo(b.time) + ' ago' : '-')) +
+        '</div>';
+    }
 
-        for (let i = blockchain.blocks; i >= Math.max(0, blockchain.blocks - 9); i--) {
-          try {
-            const block = await api('/block/height/' + i);
-            blocks.push(block);
-          } catch (e) {
-            break;
-          }
+    // Load recent blocks
+    // Renders the shared cache the ribbon already maintains, so a mine costs
+    // 0-1 requests here instead of the 11 serial round trips this used to do.
+    async function loadRecentBlocks() {
+      const container = document.getElementById('recentBlocks');
+      try {
+        let top = Math.max(cfTip === null ? -1 : cfTip,
+                           cfKnownTip === null ? -1 : cfKnownTip);
+        if (top < 0) {
+          const blockchain = await api('/blockchain/info');
+          top = blockchain.blocks;
+        }
+        await cfFetchWindow(top, 10, 6);
+
+        const blocks = [];
+        for (let h = top; h > top - 10 && h >= 0; h--) {
+          const b = cfBlocks.get(h);
+          if (b) blocks.push(b);
         }
 
-        const container = document.getElementById('recentBlocks');
+        if (!blocks.length) {
+          container.innerHTML = '<div class="empty-state">No blocks yet. Mine one to get started.</div>';
+          return;
+        }
+
         container.innerHTML = `
           <table>
             <thead>
@@ -2845,23 +3883,715 @@
                 <th>Hash</th>
                 <th>TXs</th>
                 <th>Size</th>
+                <th>Weight</th>
+                <th>Age</th>
               </tr>
             </thead>
             <tbody>
               ${blocks.map(block => `
-                <tr>
+                <tr onclick="cfOpenBlock(${block.height})" style="cursor: pointer;">
                   <td>${block.height}</td>
-                  <td class="truncate" title="${block.hash}">${block.hash}</td>
+                  <td class="truncate" title="${esc(block.hash)}">${esc(block.hash)}</td>
                   <td>${block.nTx}</td>
-                  <td>${(block.size / 1024).toFixed(2)} KB</td>
+                  <td>${esc(fmtBytes(block.size))}</td>
+                  <td>${block.weight ? block.weight.toLocaleString() : '-'}</td>
+                  <td>${esc(timeAgo(block.time))}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
         `;
       } catch (error) {
-        document.getElementById('recentBlocks').innerHTML = `<div class="empty-state">Error: ${error.message}</div>`;
+        container.innerHTML = `<div class="empty-state">Error: ${esc(error.message)}</div>`;
       }
+    }
+
+    /* ============================================================
+       Chainflow: the persistent block ribbon.
+
+       Three signals feed it, and none of them is a new backend route:
+         - POST /api/mine already returns hashes[], so a mine is visible
+           with zero extra latency and zero extra requests;
+         - GET /api/wait/height/{tip+1} is a held long poll, ~0.04 req/s,
+           which also reports a LOWER height on timeout and so catches a
+           chain reset going backwards;
+         - refreshStats already fetches /blockchain/info and /mempool/info,
+           so the mempool count and a same-height reorg come for free.
+
+       The ribbon never has innerHTML assigned after init. Blocks are cloned
+       from a <template> once and updated leaf-by-leaf, so a block that is
+       mid-animation is never destroyed underneath itself.
+       ============================================================ */
+
+    const CF_MAX_BLOCKS = 24;      // how many cubes live in the DOM
+    const CF_CACHE_MAX = 256;      // blocks are immutable, so a hit is permanent
+    const CF_WINDOW = CF_MAX_BLOCKS;   // backfill everything that is on screen
+
+    const cfBlocks = new Map();    // height -> block
+    const cfByHash = new Map();    // hash   -> height
+    const cfNodes  = new Map();    // height -> element
+
+    let cfTip = null;
+    let cfReady = false;
+    let cfAnimating = false;
+    let cfPending = null;          // coalesces bursts into one surge
+    let cfStepPx = 0;
+    let cfWatching = false;
+    let cfWatchCtrl = null;
+    let cfWatchFails = 0;
+    let cfTicker = null;
+    let cfPoolSize = -1;
+    // The height we know the chain has reached, even while the ribbon is still
+    // animating its way there. mineBlocks() refreshes the Blocks panel
+    // immediately, which would otherwise render one block short.
+    let cfKnownTip = null;
+    let cfChipSig = '';
+    let cfRebasing = false;
+
+    let cfRoot, cfTrackEl, cfViewportEl, cfTpl, cfChipsEl, cfCandEl, cfPoolSubEl,
+        cfTipAgeEl, cfEventEl, cfDividerCapEl, cfBadgeEl, cfHeightEl;
+
+    const cfMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // Consulted at every decision point rather than cached: the setting can
+    // change mid-session, and CSS cannot stop a transform driven from JS.
+    function cfReduced() { return cfMQ.matches; }
+
+    function cfSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // A 0.01ms transition (what the reduced-motion rule clamps everything to)
+    // may be coalesced away and never fire transitionend, which would strand
+    // classes and leak nodes. The timeout is authoritative; the event is the
+    // optimisation.
+    function cfAfter(el, ms, fn) {
+      let done = false;
+      const run = () => {
+        if (done) return;
+        done = true;
+        el.removeEventListener('transitionend', run);
+        fn();
+      };
+      el.addEventListener('transitionend', run, { once: true });
+      setTimeout(run, ms + 80);
+    }
+
+    function timeAgo(unixSeconds) {
+      if (!unixSeconds) return '-';
+      // A block header time is max(mediantime+1, now) and can legitimately sit
+      // ahead of the client clock, so negatives clamp rather than read "-3s".
+      const s = Math.max(0, Math.floor(Date.now() / 1000) - unixSeconds);
+      if (s < 60) return s + 's';
+      if (s < 3600) return Math.floor(s / 60) + 'm';
+      if (s < 86400) return Math.floor(s / 3600) + 'h';
+      return Math.floor(s / 86400) + 'd';
+    }
+
+    function fmtBytes(n) {
+      if (typeof n !== 'number' || !isFinite(n)) return '-';
+      if (n < 1024) return n + ' B';
+      if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+      return (n / 1048576).toFixed(2) + ' MB';
+    }
+
+    // ---------- geometry ----------
+    // Measured once, and again only on a debounced resize, so nothing in the
+    // animation path ever forces a layout read.
+    function cfStep() {
+      if (cfStepPx) return cfStepPx;
+      const first = cfTrackEl && cfTrackEl.firstElementChild;
+      if (first) {
+        const cs = getComputedStyle(first);
+        const gap = parseFloat(getComputedStyle(cfTrackEl).columnGap) || 0;
+        cfStepPx = first.offsetWidth + (parseFloat(cs.marginRight) || 0) + gap;
+      }
+      return cfStepPx || 118;
+    }
+
+    // ---------- element construction ----------
+    function cfBlockEl(height) {
+      const el = cfTpl.content.firstElementChild.cloneNode(true);
+      el.__h = el.querySelector('.cf-h');
+      el.__tx = el.querySelector('.cf-tx');
+      el.__sz = el.querySelector('.cf-sz');
+      el.__age = el.querySelector('.cf-age');
+      el.__pips = el.querySelector('.cf-pips');
+      el.__height = height;
+      el.dataset.height = String(height);
+      el.dataset.skeleton = 'true';
+      el.dataset.empty = 'true';
+      // Written from arithmetic, so every cube is correct and legible before
+      // any network response arrives.
+      el.__h.textContent = '#' + height;
+      el.__tx.textContent = '···';
+      el.__sz.textContent = '';
+      el.__age.textContent = '';
+      el.title = 'Block ' + height;
+      el.addEventListener('click', () => cfOpenBlock(height));
+      return el;
+    }
+
+    function cfSetText(node, s) {
+      if (node && node.textContent !== s) node.textContent = s;
+    }
+
+    // One square per transaction, gold for the coinbase. Above a dozen the
+    // grid stops being countable and a fill bar says more.
+    function cfSetPips(el, nTx) {
+      const want = Math.min(nTx || 0, 12);
+      const pips = el.__pips;
+      while (pips.children.length > want) pips.removeChild(pips.lastChild);
+      while (pips.children.length < want) {
+        const i = document.createElement('i');
+        i.className = 'cf-pip';
+        pips.appendChild(i);
+      }
+      if (pips.firstChild) pips.firstChild.className = 'cf-pip cf-pip--coinbase';
+    }
+
+    function cfPaintBlock(el, b) {
+      if (!el || !b) return;
+      const nTx = b.nTx || 0;
+      // Transaction count, not fee rate: on a hand-mined regtest chain every
+      // block pays zero fees, so a fee ramp would be 24 identical squares.
+      const fill = nTx <= 1 ? 0 : Math.min(1, Math.log2(nTx) / 6);
+      el.style.setProperty('--cf-fill', String(fill));
+      el.dataset.skeleton = 'false';
+      el.dataset.empty = nTx <= 1 ? 'true' : 'false';
+      el.dataset.dense = nTx > 12 ? 'true' : 'false';
+      cfSetText(el.__h, '#' + b.height);
+      cfSetText(el.__tx, nTx <= 1 ? 'coinbase only' : nTx + ' txs');
+      cfSetText(el.__sz, fmtBytes(b.size));
+      cfSetText(el.__age, timeAgo(b.time));
+      cfSetPips(el, nTx);
+      el.title = 'Block ' + b.height + ' · ' + (b.hash || '');
+    }
+
+    function cfMarkTip() {
+      cfNodes.forEach((el, h) => el.classList.toggle('is-tip', h === cfTip));
+    }
+
+    // ---------- the one motion primitive ----------
+    // Insert first, counter-translate to hide the insert, then release: one
+    // composited transform on one element however many blocks arrived.
+    function cfShiftTrack(n, ms, wasAtStart) {
+      if (!cfTrackEl) return;
+      if (cfViewportEl && wasAtStart === false) {
+        // The user is reading history. Hold their position, do not animate.
+        cfViewportEl.scrollLeft += n * cfStep();
+        return;
+      }
+      // Pin the lane back to the tip: inserting at the front can nudge
+      // scrollLeft on its own, and one step per mine walks the tip off-screen.
+      if (cfViewportEl && cfViewportEl.scrollLeft !== 0) cfViewportEl.scrollLeft = 0;
+      if (cfReduced() || n <= 0) {
+        cfTrackEl.style.setProperty('--cf-shift', '0px');
+        return;
+      }
+      cfTrackEl.classList.add('is-priming');
+      cfTrackEl.style.setProperty('--cf-shift', (-n * cfStep()) + 'px');
+      void cfTrackEl.offsetWidth;          // the one deliberate forced layout
+      cfTrackEl.classList.remove('is-priming');
+      cfTrackEl.classList.add('is-shifting');
+      cfTrackEl.style.setProperty('--cf-dur', ms + 'ms');
+      cfTrackEl.style.setProperty('--cf-shift', '0px');
+    }
+
+    function cfPrune() {
+      if (cfTip === null) return;
+      const floor = cfTip - CF_MAX_BLOCKS + 1;
+      cfNodes.forEach((el, h) => {
+        if (h < floor) {
+          el.remove();
+          cfNodes.delete(h);
+        }
+      });
+    }
+
+    function cfDrain() {
+      if (cfBlocks.size <= CF_CACHE_MAX) return;
+      const heights = Array.from(cfBlocks.keys()).sort((a, b) => a - b);
+      const drop = heights.slice(0, cfBlocks.size - CF_CACHE_MAX);
+      drop.forEach(h => {
+        const b = cfBlocks.get(h);
+        if (b && b.hash) cfByHash.delete(b.hash);
+        cfBlocks.delete(h);
+      });
+    }
+
+    // ---------- fetching ----------
+    async function cfFetchBlock(h) {
+      try {
+        const b = await api('/block/height/' + h);
+        if (!b || typeof b.height !== 'number') return null;
+        cfBlocks.set(h, b);
+        if (b.hash) cfByHash.set(b.hash, h);
+        cfVerifyLink(b);
+        const node = cfNodes.get(h);
+        if (node) cfPaintBlock(node, b);
+        if (h === cfTip) cfUpdateTipAge();
+        return b;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Keyed by height, valid by hash: if a block's parent does not match what
+    // we cached at that height, the chain forked under us.
+    function cfVerifyLink(b) {
+      if (cfRebasing || !b || !b.previousblockhash) return;
+      const parent = cfBlocks.get(b.height - 1);
+      if (parent && parent.hash && parent.hash !== b.previousblockhash) {
+        cfEvent('reorg · chain rebuilt from #' + (b.height - 1));
+        cfInvalidateFrom(b.height - 1);
+        cfReconcile();
+      }
+    }
+
+    async function cfFetchWindow(top, count, concurrency) {
+      const wanted = [];
+      for (let h = top; h > top - count && h >= 0; h--) {
+        if (!cfBlocks.has(h)) wanted.push(h);
+      }
+      if (!wanted.length) return;
+      let i = 0;
+      const lanes = Math.max(1, Math.min(concurrency || 6, wanted.length));
+      await Promise.all(Array.from({ length: lanes }, async () => {
+        while (i < wanted.length) await cfFetchBlock(wanted[i++]);
+      }));
+      cfDrain();
+    }
+
+    // ---------- painting the lane ----------
+    function cfRenderFrom(top) {
+      cfTrackEl.textContent = '';
+      cfNodes.clear();
+      const frag = document.createDocumentFragment();
+      for (let h = top; h > top - CF_MAX_BLOCKS && h >= 0; h--) {
+        const el = cfBlockEl(h);
+        const b = cfBlocks.get(h);
+        if (b) cfPaintBlock(el, b);
+        cfNodes.set(h, el);
+        frag.appendChild(el);
+      }
+      cfTrackEl.appendChild(frag);
+      cfStepPx = 0;
+      cfMarkTip();
+    }
+
+    function cfSetHeightLabel(h) {
+      if (!cfHeightEl) return;
+      const s = (typeof h === 'number') ? h.toLocaleString() : '-';
+      if (cfHeightEl.textContent === s) return;
+      cfHeightEl.textContent = s;
+      // Clear rather than just skip: the preference can be switched on while
+      // the page is open, and the class is what replays the animation.
+      if (cfReduced()) { cfHeightEl.classList.remove('is-ticking'); return; }
+      cfHeightEl.classList.remove('is-ticking');
+      void cfHeightEl.offsetWidth;
+      cfHeightEl.classList.add('is-ticking');
+    }
+
+    function cfUpdateTipAge() {
+      if (!cfTipAgeEl) return;
+      const b = cfTip !== null ? cfBlocks.get(cfTip) : null;
+      let s = '-';
+      if (cfTip === 0) s = 'genesis';
+      else if (b && b.time) s = 'tip mined ' + timeAgo(b.time) + ' ago';
+      cfSetText(cfTipAgeEl, s);
+    }
+
+    function cfEmptyChainHint(on) {
+      const bar = document.getElementById('mineBar');
+      if (!bar) return;
+      bar.classList.toggle('is-hinted', !!on);
+    }
+
+    // ---------- tip movement ----------
+    async function cfSetTip(target) {
+      if (cfTip === null) return cfRebase(target);
+      if (target <= cfTip) return;
+      if (cfAnimating) {
+        cfPending = Math.max(cfPending || 0, target);
+        return;
+      }
+      cfAnimating = true;
+
+      // Sampled before anything is inserted (see cfShiftTrack).
+      const wasAtStart = !cfViewportEl || cfViewportEl.scrollLeft <= 1;
+      const from = cfTip;
+      const n = target - from;
+      const shown = Math.min(n, CF_MAX_BLOCKS);
+      const frag = document.createDocumentFragment();
+      const fresh = [];
+      // Newest first: the lane runs tip -> older, left to right.
+      for (let h = target; h > target - shown; h--) {
+        const el = cfBlockEl(h);
+        const b = cfBlocks.get(h);
+        if (b) cfPaintBlock(el, b);
+        if (!cfReduced()) {
+          el.classList.add('is-new');
+          el.style.animationDelay = ((target - h) * 60) + 'ms';
+        }
+        cfNodes.set(h, el);
+        fresh.push(el);
+        frag.appendChild(el);
+      }
+      cfTrackEl.insertBefore(frag, cfTrackEl.firstChild);
+
+      cfTip = target;
+      cfSetHeightLabel(cfTip);
+      cfMarkTip();
+      cfEmptyChainHint(false);
+
+      const dur = shown > 4 ? 640 : 520;
+      cfShiftTrack(shown, dur, wasAtStart);
+
+      // Details stream in behind the animation; the cubes are already correct.
+      cfFetchWindow(target, shown + 2, 6).then(cfUpdateTipAge);
+
+      cfAfter(cfTrackEl, dur, () => {
+        cfTrackEl.classList.remove('is-shifting');
+        cfTrackEl.style.removeProperty('will-change');
+        fresh.forEach(el => {
+          el.classList.remove('is-new');
+          el.style.removeProperty('animation-delay');
+        });
+        if (wasAtStart && cfViewportEl && cfViewportEl.scrollLeft !== 0) {
+          cfViewportEl.scrollLeft = 0;
+        }
+        cfPrune();
+        cfDrain();
+        // The Mining panel's block count sits right under a live ribbon, so a
+        // tip that moved for any reason has to reach it too. Free unless that
+        // panel is the one on screen.
+        if (document.getElementById('tab-mining').classList.contains('active')) {
+          loadMiningInfo();
+        }
+        cfAnimating = false;
+        if (cfPending !== null) {
+          const next = cfPending;
+          cfPending = null;
+          cfSetTip(next);
+        }
+      });
+    }
+
+    // Clears both maps outright. A partial purge after a chain reset is worse
+    // than none: every cached height above 0 is unreachable.
+    async function cfRebase(height) {
+      cfRebasing = true;
+      cfBlocks.clear();
+      cfByHash.clear();
+      cfTip = height;
+      cfKnownTip = height;
+      cfSetHeightLabel(height);
+      cfRenderFrom(height);
+      cfEmptyChainHint(height === 0);
+      await cfFetchWindow(height, CF_WINDOW, 6);
+      cfRenderFrom(height);
+      if (cfViewportEl) cfViewportEl.scrollLeft = 0;
+      cfUpdateTipAge();
+      cfRebasing = false;
+    }
+
+    function cfInvalidateFrom(height) {
+      Array.from(cfBlocks.keys()).forEach(h => {
+        if (h >= height) {
+          const b = cfBlocks.get(h);
+          if (b && b.hash) cfByHash.delete(b.hash);
+          cfBlocks.delete(h);
+        }
+      });
+      // Back to a skeleton until the replacement block arrives.
+      cfNodes.forEach((el, h) => {
+        if (h < height) return;
+        el.dataset.skeleton = 'true';
+        el.dataset.empty = 'true';
+        el.style.removeProperty('--cf-fill');
+        cfSetText(el.__tx, '···');
+        cfSetText(el.__sz, '');
+        cfSetText(el.__age, '');
+        cfSetPips(el, 0);
+      });
+    }
+
+    // ---------- reconcile / reorg ----------
+    async function cfReconcile() {
+      try {
+        const info = await api('/blockchain/info');
+        if (!info || typeof info.blocks !== 'number') return;
+        if (cfTip === null) return cfRebase(info.blocks);
+        if (info.blocks < cfTip) return cfRebase(info.blocks);
+        const held = cfBlocks.get(info.blocks);
+        if (held && held.hash && held.hash !== info.bestblockhash) {
+          return cfRebase(info.blocks);
+        }
+        if (info.blocks > cfTip) return cfSetTip(info.blocks);
+        // Same height, but nothing cached there: an invalidation cleared it
+        // and there is no hash left to compare, so refetch from the node.
+        if (!held) return cfRebase(info.blocks);
+        // Finally, top up any holes inside the visible window.
+        await cfFetchWindow(cfTip, CF_WINDOW, 6);
+      } catch (e) { /* the panels surface their own errors */ }
+    }
+
+    // Height can stay the SAME across a reorg, which no height watcher can
+    // see. refreshStats already has bestblockhash in hand, so this costs
+    // nothing and also catches a CLI invalidateblock or a second tab.
+    function cfNoteBestHash(height, hash) {
+      if (cfTip === null || !hash || height !== cfTip) return;
+      const held = cfBlocks.get(height);
+      if (held && held.hash && held.hash !== hash) {
+        cfEvent('reorg · tip replaced');
+        cfInvalidateFrom(height);
+        cfRebase(height);
+      }
+    }
+
+    function cfOnMined(result, tipBefore) {
+      if (!result) return;
+      const n = (result.hashes && result.hashes.length) || result.blocks || 0;
+      const base = (typeof tipBefore === 'number') ? tipBefore : cfTip;
+      if (!n || base === null) return cfReconcile();
+      const target = base + n;
+      cfKnownTip = Math.max(cfKnownTip === null ? -1 : cfKnownTip, target);
+      cfFlyChips();
+      cfFireDivider();
+      // The cube leaves the divider just after the chips reach it.
+      setTimeout(() => cfSetTip(target), cfReduced() ? 0 : 180);
+    }
+
+    function cfOnReorg(result) {
+      if (!result) return cfReconcile();
+      const from = (result.invalidated && result.invalidated.height) ||
+                   (result.before && result.before.height) || cfTip;
+      cfNodes.forEach((el, h) => { if (h >= from) el.classList.add('is-orphaned'); });
+      const dropped = (result.disconnectedBlocks && result.disconnectedBlocks.length) || 0;
+      cfEvent('reorg · ' + dropped + ' block' + (dropped === 1 ? '' : 's') + ' replaced');
+      const after = (result.after && result.after.height);
+      setTimeout(() => {
+        cfInvalidateFrom(from);
+        cfRebase(typeof after === 'number' ? after : cfTip);
+      }, cfReduced() ? 0 : 1200);
+    }
+
+    // ---------- mempool ----------
+    function cfSetMempool(info) {
+      if (!cfRoot || !info) return;
+      const size = info.size || 0;
+      cfRoot.dataset.pool = size > 0 ? 'has' : 'empty';
+      cfSetText(cfPoolSubEl, size > 0
+        ? 'next block · ' + size + ' tx' + (size === 1 ? '' : 's')
+        : 'next block · empty');
+      if (cfBadgeEl) {
+        cfBadgeEl.hidden = size === 0;
+        cfSetText(cfBadgeEl, String(size));
+      }
+      if (size !== cfPoolSize) {
+        cfPoolSize = size;
+        if (size === 0) {
+          cfChipsEl.textContent = '';
+          cfChipSig = '';
+        } else if (currentNetwork === 'regtest' && size <= 25) {
+          cfLoadChips();
+        }
+      }
+    }
+
+    async function cfLoadChips() {
+      try {
+        const raw = await api('/mempool/raw?verbose=true');
+        const ids = Object.keys(raw || {});
+        const sig = ids.slice().sort().join(',');
+        if (sig === cfChipSig) return;
+        cfChipSig = sig;
+
+        // Fee-rate colour only when the mempool actually spans a range.
+        // Three identical 1 sat/vB transactions get plain accent, because
+        // colouring them would invent information that is not there.
+        const rates = ids.map(id => {
+          const e = raw[id] || {};
+          const vsize = e.vsize || e.weight / 4 || 1;
+          const fee = (e.fees && e.fees.base) || 0;
+          return (fee * 1e8) / vsize;
+        });
+        const lo = Math.min.apply(null, rates.length ? rates : [0]);
+        const hi = Math.max.apply(null, rates.length ? rates : [0]);
+        const spread = lo > 0 && hi / lo >= 2;
+
+        cfChipsEl.textContent = '';
+        ids.slice(0, 24).forEach((id, i) => {
+          const c = document.createElement('i');
+          c.className = 'cf-chip';
+          if (spread) {
+            const r = rates[i];
+            if (r >= hi * 0.75) c.dataset.rate = 'high';
+            else if (r <= lo * 1.25) c.dataset.rate = 'low';
+          }
+          c.title = id + (spread ? ' · ' + rates[i].toFixed(1) + ' sat/vB' : '');
+          if (!cfReduced()) c.classList.add('is-entering');
+          cfChipsEl.appendChild(c);
+        });
+      } catch (e) { /* mempool panel reports its own errors */ }
+    }
+
+    function cfFlyChips() {
+      if (!cfChipsEl || cfReduced()) { if (cfChipsEl) cfChipsEl.textContent = ''; return; }
+      const chips = Array.from(cfChipsEl.children);
+      if (!chips.length) return;
+      chips.forEach((c, i) => {
+        c.style.setProperty('--cf-fly', '60px');
+        c.style.animationDelay = (i * 30) + 'ms';
+        c.classList.add('is-flying');
+      });
+      setTimeout(() => { cfChipsEl.textContent = ''; cfChipSig = ''; }, 240 + chips.length * 30);
+    }
+
+    function cfFireDivider() {
+      if (!cfDividerCapEl || cfReduced()) return;
+      cfDividerCapEl.classList.remove('is-firing');
+      void cfDividerCapEl.offsetWidth;
+      cfDividerCapEl.classList.add('is-firing');
+    }
+
+    // ---------- the event pill ----------
+    // Mining from a tab where #mineResult is off-screen used to report
+    // nothing at all. This is the smallest thing that fixes that.
+    function cfEvent(text, kind) {
+      if (!cfEventEl) return;
+      cfEventEl.textContent = text;
+      cfEventEl.dataset.kind = kind || 'info';
+      cfEventEl.hidden = false;
+    }
+
+    function cfOpenBlock(height) {
+      const input = document.getElementById('blockLookup');
+      if (input) input.value = String(height);
+      if (typeof selectTab === 'function') selectTab('blocks');
+      if (typeof lookupBlock === 'function') lookupBlock();
+    }
+
+    // ---------- watcher ----------
+    async function cfWatchOnce() {
+      const ctrl = new AbortController();
+      cfWatchCtrl = ctrl;
+      try {
+        const r = await api('/wait/height/' + (cfTip + 1) + '?timeout=25&interval=400',
+                            { signal: ctrl.signal });
+        cfWatchFails = 0;
+        return r;
+      } catch (e) {
+        // api() awaits fetch before reading the body, so an abort surfaces
+        // untyped here. Checking it BEFORE the failure counter is what keeps
+        // every tab-hide from degrading the watcher into the slow fallback.
+        if (e && e.name === 'AbortError') return null;
+        cfWatchFails++;
+        await cfSleep(Math.min(8000, 1000 * cfWatchFails));
+        return undefined;
+      } finally {
+        if (cfWatchCtrl === ctrl) cfWatchCtrl = null;
+      }
+    }
+
+    async function cfWatchLoop() {
+      while (cfWatching) {
+        if (cfTip === null) { await cfSleep(1000); continue; }
+        const r = await cfWatchOnce();
+        if (!cfWatching) return;
+        if (r === null) return;              // aborted: a new loop will take over
+        if (r === undefined) continue;       // errored: already backed off
+        const h = (r && typeof r.height === 'number') ? r.height : null;
+        if (h === null) { await cfSleep(1000); continue; }
+        if (h > cfTip) await cfSetTip(h);
+        else if (h < cfTip) await cfRebase(h);
+        // No height progress is the tight-loop signal, not a short wait:
+        // a fast response mid-burst is perfectly legitimate.
+        else await cfSleep(250);
+      }
+    }
+
+    function cfStartWatcher() {
+      if (cfWatching || !cfReady) return;
+      cfWatching = true;
+      cfWatchFails = 0;
+      cfWatchLoop();
+    }
+
+    function cfStopWatcher() {
+      cfWatching = false;
+      if (cfWatchCtrl) { try { cfWatchCtrl.abort(); } catch (e) {} }
+      cfWatchCtrl = null;
+    }
+
+    function cfStartTicker() {
+      if (cfTicker) return;
+      // Information, not motion: this keeps running under reduced motion.
+      cfTicker = setInterval(() => {
+        cfNodes.forEach((el, h) => {
+          const b = cfBlocks.get(h);
+          if (b && b.time) cfSetText(el.__age, timeAgo(b.time));
+        });
+        cfUpdateTipAge();
+      }, 1000);
+    }
+
+    function cfStopTicker() {
+      if (cfTicker) clearInterval(cfTicker);
+      cfTicker = null;
+    }
+
+    // ---------- init ----------
+    async function cfInit() {
+      cfRoot = document.getElementById('chainflow');
+      if (!cfRoot) return;
+      cfTrackEl = document.getElementById('cfTrack');
+      cfViewportEl = document.getElementById('cfViewport');
+      cfTpl = document.getElementById('cfBlockTpl');
+      cfChipsEl = document.getElementById('cfChips');
+      cfCandEl = document.getElementById('cfCandidate');
+      cfPoolSubEl = document.getElementById('cfPoolSub');
+      cfTipAgeEl = document.getElementById('cfTipAge');
+      cfEventEl = document.getElementById('cfEvent');
+      cfDividerCapEl = document.getElementById('cfDividerCap');
+      cfBadgeEl = document.getElementById('railMempoolBadge');
+      cfHeightEl = document.getElementById('blockHeight');
+
+      if (cfEventEl) cfEventEl.addEventListener('click', () => { cfEventEl.hidden = true; });
+
+      // Ghost cubes hold the footprint so the hero is never an empty box
+      // while the first request is in flight.
+      cfTrackEl.textContent = '';
+      const ghosts = document.createDocumentFragment();
+      for (let i = 0; i < 3; i++) {
+        const el = cfTpl.content.firstElementChild.cloneNode(true);
+        el.dataset.skeleton = 'true';
+        el.dataset.empty = 'true';
+        el.style.opacity = '0.45';
+        el.querySelector('.cf-h').textContent = '···';
+        el.querySelector('.cf-tx').textContent = '';
+        el.querySelector('.cf-sz').textContent = '';
+        el.querySelector('.cf-age').textContent = '';
+        ghosts.appendChild(el);
+      }
+      cfTrackEl.appendChild(ghosts);
+
+      let resizeT = null;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeT);
+        resizeT = setTimeout(() => { cfStepPx = 0; }, 150);
+      }, { passive: true });
+
+      try {
+        const info = await api('/blockchain/info');
+        await cfRebase(info.blocks);
+      } catch (e) {
+        cfTrackEl.textContent = '';
+        cfSetText(cfTipAgeEl, 'node unreachable');
+        return;
+      }
+
+      cfReady = true;
+      cfStartTicker();
+      cfStartWatcher();          // never armed until cfTip is a real height
     }
 
     // Load mining info
@@ -3535,29 +5265,56 @@
 
     // Theme Management
     const defaultTheme = {
-      accent: '#3b82f6',
-      bg: '#0a0f17',
-      card: '#111827',
-      text: '#f0f6fc'
+      accent: '#3ecfff',
+      bg: '#080b14',
+      card: '#111725',
+      text: '#e6edf9'
     };
 
+    const THEME_VERSION = 2;
+    let suspendSave = false;
+
+    // One ground per family, varying only the accent. Each dark preset used to
+    // tint its own background toward its accent (#170a0a red, #17150a yellow),
+    // which muddied half of them. Every light accent is darkened: #f7931a on
+    // #f8fafc was 2.15:1. The KEYS are load-bearing -- syncActivePreset
+    // recovers them by regexing each swatch's onclick attribute.
     const presets = {
       // Dark themes
-      bitcoin: { accent: '#f7931a', bg: '#0d1117', card: '#161b22', text: '#f0f6fc' },
-      green: { accent: '#22c55e', bg: '#0a0f0a', card: '#111a11', text: '#f0f6fc' },
-      blue: { accent: '#3b82f6', bg: '#0a0f17', card: '#111827', text: '#f0f6fc' },
-      purple: { accent: '#a855f7', bg: '#0f0a17', card: '#1a1127', text: '#f0f6fc' },
-      red: { accent: '#ef4444', bg: '#170a0a', card: '#271111', text: '#f0f6fc' },
-      pink: { accent: '#ec4899', bg: '#170a11', card: '#27111a', text: '#f0f6fc' },
-      teal: { accent: '#14b8a6', bg: '#0a1717', card: '#112222', text: '#f0f6fc' },
-      yellow: { accent: '#eab308', bg: '#17150a', card: '#222011', text: '#f0f6fc' },
+      bitcoin: { accent: '#f7931a', bg: '#080b14', card: '#111725', text: '#e6edf9' },
+      green: { accent: '#4de3a0', bg: '#080b14', card: '#111725', text: '#e6edf9' },
+      blue: { accent: '#3ecfff', bg: '#080b14', card: '#111725', text: '#e6edf9' },
+      purple: { accent: '#a78bfa', bg: '#080b14', card: '#111725', text: '#e6edf9' },
+      red: { accent: '#ff7a6d', bg: '#080b14', card: '#111725', text: '#e6edf9' },
+      pink: { accent: '#ff6ec7', bg: '#080b14', card: '#111725', text: '#e6edf9' },
+      teal: { accent: '#2ee6c8', bg: '#080b14', card: '#111725', text: '#e6edf9' },
+      yellow: { accent: '#f5d90a', bg: '#080b14', card: '#111725', text: '#e6edf9' },
       // Light themes
-      lightBlue: { accent: '#3b82f6', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' },
-      lightGreen: { accent: '#22c55e', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' },
-      lightPurple: { accent: '#a855f7', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' },
-      lightOrange: { accent: '#f7931a', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' },
-      lightGray: { accent: '#64748b', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' },
-      lightTeal: { accent: '#14b8a6', bg: '#f8fafc', card: '#ffffff', text: '#1e293b' }
+      lightBlue: { accent: '#0a6fbd', bg: '#f4f6fb', card: '#ffffff', text: '#111826' },
+      lightGreen: { accent: '#0b7a44', bg: '#f4f6fb', card: '#ffffff', text: '#111826' },
+      lightPurple: { accent: '#6d3fd4', bg: '#f4f6fb', card: '#ffffff', text: '#111826' },
+      lightOrange: { accent: '#a35a05', bg: '#f4f6fb', card: '#ffffff', text: '#111826' },
+      lightGray: { accent: '#4a5668', bg: '#f4f6fb', card: '#ffffff', text: '#111826' },
+      lightTeal: { accent: '#0a7a75', bg: '#f4f6fb', card: '#ffffff', text: '#111826' }
+    };
+
+    // Every v1 preset quad, so someone who picked "Teal" is moved to the
+    // retuned teal rather than pinned to #14b8a6 forever.
+    const LEGACY_THEME_MAP = {
+      '#3b82f6|#0a0f17|#111827|#f0f6fc': 'blue',
+      '#f7931a|#0d1117|#161b22|#f0f6fc': 'bitcoin',
+      '#22c55e|#0a0f0a|#111a11|#f0f6fc': 'green',
+      '#a855f7|#0f0a17|#1a1127|#f0f6fc': 'purple',
+      '#ef4444|#170a0a|#271111|#f0f6fc': 'red',
+      '#ec4899|#170a11|#27111a|#f0f6fc': 'pink',
+      '#14b8a6|#0a1717|#112222|#f0f6fc': 'teal',
+      '#eab308|#17150a|#222011|#f0f6fc': 'yellow',
+      '#3b82f6|#f8fafc|#ffffff|#1e293b': 'lightBlue',
+      '#22c55e|#f8fafc|#ffffff|#1e293b': 'lightGreen',
+      '#a855f7|#f8fafc|#ffffff|#1e293b': 'lightPurple',
+      '#f7931a|#f8fafc|#ffffff|#1e293b': 'lightOrange',
+      '#64748b|#f8fafc|#ffffff|#1e293b': 'lightGray',
+      '#14b8a6|#f8fafc|#ffffff|#1e293b': 'lightTeal'
     };
 
     function toggleThemePanel() {
@@ -3583,14 +5340,19 @@
       switch(type) {
         case 'accent':
           root.style.setProperty('--accent-orange', value);
-          root.style.setProperty('--accent-2', adjustColor(value, 28));
           root.style.setProperty('--accent-rgb', hexToRgb(value));
-          // Text that stays legible on a filled accent button
-          root.style.setProperty('--accent-contrast', getLuminance(value) > 0.42 ? '#0b1220' : '#ffffff');
-          // Two hue companions turn a single accent into a multicolor wallpaper mesh
+          // Compare the two candidates instead of guessing a threshold. The
+          // old 0.42 cut put the crossover in the wrong place, which is how
+          // #f7931a ended up with white ink at 2.29:1.
+          const L = getLuminance(value);
+          const onDark = (L + 0.05) / 0.0553;
+          const onLight = 1.05 / (L + 0.05);
+          root.style.setProperty('--accent-contrast', onDark >= onLight ? '#05101a' : '#ffffff');
+          // Analogous, not complementary: a cyan accent should give a cold
+          // field, not cyan + magenta + lime.
           root.style.setProperty('--glow-a-rgb', hexToRgb(value));
-          root.style.setProperty('--glow-b-rgb', hexToRgb(rotateHue(value, 130)));
-          root.style.setProperty('--glow-c-rgb', hexToRgb(rotateHue(value, -110)));
+          root.style.setProperty('--glow-b-rgb', hexToRgb(rotateHue(value, 38)));
+          root.style.setProperty('--glow-c-rgb', hexToRgb(rotateHue(value, -34)));
           document.getElementById('accentColorText').value = value;
           document.getElementById('accentColor').value = value;
           break;
@@ -3599,10 +5361,11 @@
           root.style.setProperty('--bg-rgb', hexToRgb(value));
           document.getElementById('bgColorText').value = value;
           document.getElementById('bgColor').value = value;
-          // Pale backgrounds need dark hairlines and darker semantic colors
+          // Pale backgrounds need dark hairlines and darker semantic colors.
+          // The hairline and well tones themselves are color-mix()ed against
+          // this value in :root, so nothing is set inline here: adjustColor
+          // saturated to pure #ffffff on every light preset.
           root.setAttribute('data-theme', getLuminance(value) > 0.5 ? 'light' : 'dark');
-          root.style.setProperty('--bg-tertiary', adjustColor(value, 20));
-          root.style.setProperty('--border-color', adjustColor(value, 35));
           break;
         case 'card':
           root.style.setProperty('--bg-secondary', value);
@@ -3613,14 +5376,15 @@
         case 'text':
           root.style.setProperty('--text-primary', value);
           root.style.setProperty('--text-rgb', hexToRgb(value));
-          root.style.setProperty('--text-secondary', adjustColor(value, -40));
           document.getElementById('textColorText').value = value;
           document.getElementById('textColor').value = value;
           break;
       }
 
-      saveTheme();
-      syncActivePreset();
+      if (!suspendSave) {
+        saveTheme();
+        syncActivePreset();
+      }
     }
 
     function updateColorFromText(type, value) {
@@ -3715,7 +5479,7 @@
     // Feed the cursor position to the spotlight gradient on glass surfaces
     function trackSpotlight() {
       document.addEventListener('pointermove', (e) => {
-        const surface = e.target.closest('.card, .stat-card, .quick-action-btn');
+        const surface = e.target.closest('.card, .stat-card');
         if (!surface) return;
         const rect = surface.getBoundingClientRect();
         surface.style.setProperty('--spot-x', `${e.clientX - rect.left}px`);
@@ -3723,48 +5487,66 @@
       }, { passive: true });
     }
 
+    // bg before text: the color-mix() derivations in :root read the
+    // background, so applying them out of order flashes the wrong hairlines.
+    function applyTheme(t) {
+      suspendSave = true;
+      updateColor('accent', t.accent);
+      updateColor('bg', t.bg);
+      updateColor('card', t.card);
+      updateColor('text', t.text);
+      suspendSave = false;
+      saveTheme();
+      syncActivePreset();
+    }
+
     function applyPreset(name) {
       const preset = presets[name];
-      if (preset) {
-        updateColor('accent', preset.accent);
-        updateColor('bg', preset.bg);
-        updateColor('card', preset.card);
-        updateColor('text', preset.text);
-      }
+      if (preset) applyTheme(preset);
     }
 
     function saveTheme() {
-      const theme = {
+      if (suspendSave) return;
+      localStorage.setItem('dashboardTheme', JSON.stringify({
+        v: THEME_VERSION,
         accent: document.getElementById('accentColor').value,
         bg: document.getElementById('bgColor').value,
         card: document.getElementById('cardColor').value,
         text: document.getElementById('textColor').value
-      };
-      localStorage.setItem('dashboardTheme', JSON.stringify(theme));
+      }));
     }
 
     function loadTheme() {
-      const saved = localStorage.getItem('dashboardTheme');
-      if (saved) {
-        try {
-          const theme = JSON.parse(saved);
-          updateColor('accent', theme.accent);
-          updateColor('bg', theme.bg);
-          updateColor('card', theme.card);
-          updateColor('text', theme.text);
-        } catch (e) {
-          console.log('Failed to load theme:', e);
-        }
+      let theme = null;
+      try {
+        const saved = localStorage.getItem('dashboardTheme');
+        if (saved) theme = JSON.parse(saved);
+      } catch (e) {
+        console.log('Failed to load theme:', e);
+        theme = null;
       }
+
+      if (theme && theme.v !== THEME_VERSION) {
+        const key = [theme.accent, theme.bg, theme.card, theme.text]
+          .map(c => String(c || '').toLowerCase()).join('|');
+        const named = LEGACY_THEME_MAP[key];
+        // A quad matching no preset was hand-picked, so it is kept verbatim
+        // and simply flows through the new derivations.
+        if (named) theme = Object.assign({}, presets[named]);
+      }
+
+      // Always apply, even with nothing stored: that is what makes a fresh
+      // visitor and a returning one land on identical derived tokens.
+      applyTheme(theme && theme.accent ? theme : defaultTheme);
     }
 
     function resetTheme() {
       localStorage.removeItem('dashboardTheme');
-      setGlass(false);
-      updateColor('accent', defaultTheme.accent);
-      updateColor('bg', defaultTheme.bg);
-      updateColor('card', defaultTheme.card);
-      updateColor('text', defaultTheme.text);
+      // setGlass unconditionally writes the key (see below), so the removal
+      // has to come after it for the head guard to fall through to the default.
+      setGlass(true);
+      localStorage.removeItem('dashboardGlass');
+      applyTheme(defaultTheme);
     }
 
     // Chain Reset Functions
@@ -3795,14 +5577,17 @@
         });
 
         showResult('resetResult', result);
+        cfEvent('chain reset');
 
         // Refresh all stats
         setTimeout(() => {
+          cfRebase(0);
           refreshAll();
         }, 1000);
 
       } catch (error) {
         showResult('resetResult', error.message, true);
+        cfEvent(error.message, 'error');
       }
     }
 
@@ -3821,6 +5606,7 @@
 
         // Refresh all stats
         setTimeout(() => {
+          cfReconcile();
           refreshAll();
         }, 1000);
 
@@ -3838,6 +5624,8 @@
         .setAttribute('aria-checked', String(document.documentElement.getAttribute('data-glass') !== 'off'));
       trackSpotlight();
       refreshAll();
+      cfInit();
+      if (location.hash.length > 1) selectTab(location.hash.slice(1));
       // Reflect an auto-mine job that may already be running on the server
       refreshAutoMineStatus();
       // Auto-refresh every 10 seconds
@@ -4239,18 +6027,30 @@
           body: JSON.stringify({ depth, extra: Number.isFinite(extra) ? extra : 1, includeMempool })
         });
         showResult('resetResult', result);
+        // depth/extra can leave the height unchanged or even higher, so the
+        // response is the only signal that describes what actually happened.
+        cfOnReorg(result);
         refreshAll();
       } catch (e) {
         showResult('resetResult', e.message, true);
+        cfEvent(e.message, 'error');
       }
     }
 
-    window.addEventListener('beforeunload', stopLogStream);
+    window.addEventListener('beforeunload', () => { stopLogStream(); cfStopWatcher(); });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         stopLogStream();
-      } else if (logStreamStarted && document.getElementById('tab-logs').classList.contains('active')) {
-        startLogStream();
+        cfStopWatcher();
+        cfStopTicker();
+      } else {
+        if (logStreamStarted && document.getElementById('tab-logs').classList.contains('active')) {
+          startLogStream();
+        }
+        // One reconcile covers however long the tab was away, then the held
+        // poll takes over again.
+        cfStartTicker();
+        cfReconcile().then(cfStartWatcher);
       }
     });
   </script>
